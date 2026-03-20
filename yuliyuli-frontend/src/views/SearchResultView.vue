@@ -21,7 +21,7 @@
               @keyup.enter="handleSearch"
             />
             <button class="search-btn" @click="handleSearch">搜索</button>
-            <!-- 搜索下拉框 -->
+            <!-- 搜索下拉列表 -->
             <div v-if="showSearchDropdown" class="search-dropdown">
               <!-- 热门搜索 -->
               <div class="hot-search" v-if="hotSearchKeywords.length > 0">
@@ -182,30 +182,26 @@
           :class="{ active: activeSort === '最多播放' }"
           @click="handleSortClick('最多播放')"
         >
-          最多播放
-        </div>
+          最多播放        </div>
         <div
           class="sort-item"
           :class="{ active: activeSort === '最新发布' }"
           @click="handleSortClick('最新发布')"
         >
-          最新发布
-        </div>
+          最新发布        </div>
         <div
           class="sort-item"
           :class="{ active: activeSort === '最多弹幕' }"
           @click="handleSortClick('最多弹幕')"
         >
-          最多弹幕
-        </div>
+          最多弹幕        </div>
         <div
           class="sort-item"
           :class="{ active: activeSort === '最多收藏' }"
           @click="handleSortClick('最多收藏')"
         >
-          最多收藏
-        </div>
-        <div class="sort-more">更多筛选 <i class="el-icon-arrow-down"></i></div>
+          最多收藏        </div>
+        <div class="sort-more">更多筛选?<i class="el-icon-arrow-down"></i></div>
       </div>
 
       <!-- 搜索结果网格 -->
@@ -347,7 +343,7 @@
   };
 
   const handleLogin = () => {
-    // 跳转到首页并打开登录框
+    // 跳转到首页并打开登录弹窗
     router.push('/');
   };
 
@@ -377,8 +373,7 @@
   const fetchHotSearch = async () => {
     try {
       const token = localStorage.getItem('token');
-      console.log('开始获取热门视频...');
-
+  
       // 构建请求配置
       const config: any = {
         params: {
@@ -409,19 +404,16 @@
               : video.title || `热门视频 ${index + 1}`;
           return {
             keyword: title,
-            hot: index < 3 ? '热' : index < 5 ? 'NEW' : index < 8 ? '新' : undefined,
+            hot: index < 3 ? 'HOT' : index < 5 ? 'NEW' : index < 8 ? 'TOP' : undefined,
           };
         });
-        console.log('热门搜索关键词:', hotSearchKeywords.value);
-      } else {
-        console.log('后端返回数据为空');
-        hotSearchKeywords.value = [];
+          } else {
+            hotSearchKeywords.value = [];
       }
     } catch (error: any) {
       // 401错误时不显示错误信息，只设置空数组
       if (error.response && error.response.status === 401) {
-        console.log('未登录状态，无法获取热门搜索');
-      } else {
+          } else {
         console.error('获取热门搜索失败:', error);
       }
       // 即使出现错误也不阻止用户使用搜索功能
@@ -436,8 +428,7 @@
           params: { keyword: searchQuery.value },
         });
         if (response.data && response.data.code === 200) {
-          console.log('搜索建议响应:', response.data.data);
-          // 处理搜索建议 - 后端返回的是SearchVideoVO列表
+                // 处理搜索建议 - 后端返回的是SearchVideoVO列表
           searchSuggestions.value = response.data.data.flatMap((item: any) => {
             if (item.title) {
               // 直接是视频对象
@@ -460,7 +451,7 @@
   const selectSuggestion = (suggestion: string) => {
     searchQuery.value = suggestion;
     showSearchDropdown.value = false;
-    // 跳转到搜索结果页面
+    // 跳转到搜索结果页
     router.push({
       path: '/search',
       query: { keyword: suggestion },
@@ -470,7 +461,7 @@
   const selectHotKeyword = (keyword: string) => {
     searchQuery.value = keyword;
     showSearchDropdown.value = false;
-    // 跳转到搜索结果页面
+    // 跳转到搜索结果页
     router.push({
       path: '/search',
       query: { keyword: keyword },
@@ -542,18 +533,13 @@
 
       if (response.data && response.data.code === 200) {
         // 处理搜索结果 - 后端返回的是SearchVideoVO列表
-        console.log('后端返回数据:', response.data.data);
-
+    
         // 直接检查是否有视频数据
         if (Array.isArray(response.data.data)) {
           searchResults.value = response.data.data
             .map((item: any) => {
               // 打印每个item的详细信息，帮助调试
-              console.log('处理视频项:', item);
-              console.log('authorName:', item.authorName);
-              console.log('author:', item.author);
-              console.log('cover', item.cover);
-
+                                        
               // 检查item是否直接包含视频信息
               if (item.title) {
                 // 直接是视频对象
@@ -602,15 +588,13 @@
             .filter(Boolean);
         }
 
-        console.log('搜索结果:', searchResults.value);
-      } else {
+          } else {
         searchResults.value = [];
       }
     } catch (error: any) {
       // 401错误时不显示错误信息，只设置空数组
       if (error.response && error.response.status === 401) {
-        console.log('未登录状态，无法获取搜索结果');
-      } else {
+          } else {
         console.error('搜索失败:', error);
         ElMessage.error('搜索失败，请稍后重试');
       }
@@ -704,7 +688,7 @@
   .search-result {
     width: 100%;
     min-height: 100vh;
-    background-image: url('C:\Users\Administrator\Desktop\yuliyuli_enterprise\yuliyuli-frontend\static\images\v2-217f1b1062ab037739e18c823aa15db6_r.jpg');
+    background-image: url('/static/images/v2-217f1b1062ab037739e18c823aa15db6_r.jpg');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;

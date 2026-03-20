@@ -3,6 +3,11 @@ package com.yuliyuli.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.yuliyuli.annotation.Desensitize;
+import com.yuliyuli.config.DesensitizeSerializer;
+import com.yuliyuli.enums.DesensitizeType;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -25,12 +30,14 @@ public class User {
   @Parameter(name = "账号")
   @NotBlank(message = "账号不能为空")
   @Size(min = 11, max = 11, message = "账号长度必须为11位")
-  // b站手机号和账号是共用的，所以这里用phone表示
+  @Desensitize(DesensitizeType.PHONE)
+  @JsonSerialize(using = DesensitizeSerializer.class)
   private String phone;
 
   @Parameter(name = "密码")
   @NotBlank(message = "密码不能为空")
   @Size(min = 8, max = 16, message = "密码长度必须在8到12之间")
+  @JsonIgnore
   private String password;
 
   @Parameter(name = "昵称")
