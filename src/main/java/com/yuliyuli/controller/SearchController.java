@@ -13,10 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 搜索控制器
- * 提供搜索视频、获取热门视频的接口
- */
+/** 搜索控制器 提供搜索视频、获取热门视频的接口 */
 @RestController
 @RequestMapping("/api/search")
 @Tag(name = "搜索模块")
@@ -27,6 +24,7 @@ public class SearchController {
 
   /**
    * 获取前十热门视频
+   *
    * @return top10热门视频标题
    */
   @Operation(summary = "前十的热门视频获取")

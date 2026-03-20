@@ -34,7 +34,16 @@ public interface VideoMapper extends BaseMapper<Video> {
   @Insert(
       "INSERT INTO video (`user_id`,`title`,`intro`,`url`,`cover`,`type_id`,`author_name`,`is_delete`,`author_avatar`)"
           + " VALUES (#{userId},#{title},#{intro},#{url},#{cover},#{typeId},#{authorName},#{isDelete},#{authorAvatar})")
-  int insertVideo(Long userId, String title, String intro, String url, String cover, int typeId, String authorName, int isDelete, String authorAvatar);  
+  int insertVideo(
+      Long userId,
+      String title,
+      String intro,
+      String url,
+      String cover,
+      int typeId,
+      String authorName,
+      int isDelete,
+      String authorAvatar);
 
   /**
    * 插入视频点赞
@@ -62,8 +71,7 @@ public interface VideoMapper extends BaseMapper<Video> {
    * @param collectionCount 收藏数
    * @return 影响行数
    */
-  @Update(
-      "UPDATE video SET collection_count = #{collectionCount} WHERE url = #{url}")
+  @Update("UPDATE video SET collection_count = #{collectionCount} WHERE url = #{url}")
   int updateVideoCollectCount(int collectionCount, String url);
 
   /**
@@ -107,8 +115,8 @@ public interface VideoMapper extends BaseMapper<Video> {
   int deleteVideoLike(String videoId, Long userId);
 
   /**
-   * 删除视频删除状态为1的视频
-   * 用于定时删除
+   * 删除视频删除状态为1的视频 用于定时删除
+   *
    * @return 影响行数
    */
   @Delete("DELETE FROM video WHERE is_delete = 1")

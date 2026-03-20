@@ -1,9 +1,9 @@
 package com.yuliyuli.config;
 
+import com.alibaba.fastjson2.JSON;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -17,25 +17,22 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.CorsUtils;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import com.alibaba.fastjson2.JSON;
-
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-  
-  /**
-   * 密码编码器
-   */
+
+  /** 密码编码器 */
   @Bean
   public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
   }
-  
+
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
     httpSecurity
         // 禁用Session（JWT不需要Session，避免会话固定攻击）
-        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         // 禁用CSRF（JWT不需要CSRF，因为它不依赖于Cookie）
         .csrf(csrf -> csrf.disable())
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -45,11 +42,24 @@ public class SecurityConfig {
                 authorize
                     .requestMatchers(CorsUtils::isPreFlightRequest)
                     .permitAll()
-                    .requestMatchers("/api/user/login", "/api/user/register", "/api/user/getCode", 
-                        "/api/video/videoList", "/api/video/videoTypeList","/api/video/clickVideo/**", 
-                        "/api/info/authorPage/**", "/api/info/videoDelete/**", "/api/video/delivery",
-                        "/api/video/like","/api/video/comment", "/api/video/collect", "/api/user/modifyInfo", 
-                        "/api/info/follow", "/api/search/video","/api/search/topTenVideo", "/api/user/modifyAvatar")
+                    .requestMatchers(
+                        "/api/user/login",
+                        "/api/user/register",
+                        "/api/user/getCode",
+                        "/api/video/videoList",
+                        "/api/video/videoTypeList",
+                        "/api/video/clickVideo/**",
+                        "/api/info/authorPage/**",
+                        "/api/info/videoDelete/**",
+                        "/api/video/delivery",
+                        "/api/video/like",
+                        "/api/video/comment",
+                        "/api/video/collect",
+                        "/api/user/modifyInfo",
+                        "/api/info/follow",
+                        "/api/search/video",
+                        "/api/search/topTenVideo",
+                        "/api/user/modifyAvatar")
                     .permitAll()
                     .anyRequest()
                     .authenticated())
@@ -71,9 +81,7 @@ public class SecurityConfig {
                           map.put("data", null);
                           // 无权限时，返回统一的403结果
                           response.setContentType("application/json;charset=UTF-8");
-                          response
-                              .getWriter()
-                              .write(JSON.toJSONString(map));
+                          response.getWriter().write(JSON.toJSONString(map));
                         }))
         // ========== 退出登录 ==========
         .logout(
@@ -88,9 +96,7 @@ public class SecurityConfig {
                           map.put("data", null);
                           // 退出成功返回JSON
                           response.setContentType("application/json;charset=UTF-8");
-                          response
-                              .getWriter()
-                              .write(JSON.toJSONString(map));
+                          response.getWriter().write(JSON.toJSONString(map));
                         }));
     return httpSecurity.build();
   }

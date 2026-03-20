@@ -6,7 +6,6 @@ import com.yuliyuli.mapper.VideoMapper;
 import com.yuliyuli.query.VideoWrapper;
 import com.yuliyuli.util.VideoConvertUtil;
 import com.yuliyuli.vo.VideoVO;
-
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import java.time.Duration;
@@ -28,7 +27,7 @@ public class VideoInfoInit {
   public static final int EXPIRE_TIME = 1;
 
   public static final String VIDEO_CACHE_PREFIX = "video:info:";
-  public static final String VIDEO_LIST_CACHE_KEY = "video:info:list";  
+  public static final String VIDEO_LIST_CACHE_KEY = "video:info:list";
 
   @Resource private VideoWrapper videoWrapper;
 

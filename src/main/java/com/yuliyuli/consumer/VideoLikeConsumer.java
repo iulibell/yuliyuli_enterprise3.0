@@ -39,7 +39,7 @@ public class VideoLikeConsumer {
     // 从消息头中获取重试次数,如果没有则默认0
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
     Integer retryCount = (Integer) headers.getOrDefault(RETRY_HEADER, 0);
-    //参数校验
+    // 参数校验
     if (videoLike == null || videoLike.getVideoId() == null || videoLike.getUserId() == null) {
       log.error("点赞失败");
       channel.basicReject(deliveryTag, false);
@@ -50,7 +50,7 @@ public class VideoLikeConsumer {
     String userId = videoLike.getUserId().toString();
     String lockKey = LOCK_KEY_PREFIX + videoId + ":" + userId;
     RLock lock = redissonClient.getLock(lockKey);
-    try{
+    try {
       boolean isLocked = lock.tryLock(LOCK_WAIT, LOCK_RELEASE, TimeUnit.SECONDS);
       if (!isLocked) {
         log.info("用户{}点赞视频{}失败，获取分布式锁失败,已重新放入队列", userId, videoId);
@@ -70,8 +70,8 @@ public class VideoLikeConsumer {
     } finally {
       if (lock != null && lock.isHeldByCurrentThread()) {
         lock.unlock();
+      }
     }
-  }
   }
 
   @RabbitListener(queues = RabbitMqConfig.LIKE_DEAD_QUEUE_NAME)
@@ -86,14 +86,16 @@ public class VideoLikeConsumer {
     }
   }
 
-   /**
+  /**
    * 处理重试
+   *
    * @param deliveryTag 消息标签
    * @param channel 通道
    * @param retryCount 重试次数
    * @param headers 消息头
    */
-  private void handleRetry(Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
+  private void handleRetry(
+      Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
     if (retryCount < MAX_RETRY_COUNT) {
       headers.put(RETRY_HEADER, retryCount + 1);
       try {

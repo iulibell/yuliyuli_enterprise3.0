@@ -1,16 +1,15 @@
 package com.yuliyuli.service.impl;
 
 import com.yuliyuli.config.RabbitMqConfig;
-import com.yuliyuli.entity.User;
 import com.yuliyuli.entity.CurrentUserHolder;
+import com.yuliyuli.entity.User;
+import com.yuliyuli.mapper.FollowMapper;
 import com.yuliyuli.mapper.UserMapper;
 import com.yuliyuli.mapper.VideoMapper;
-import com.yuliyuli.mapper.FollowMapper;
 import com.yuliyuli.query.VideoWrapper;
 import com.yuliyuli.service.InfoService;
 import com.yuliyuli.util.VideoConvertUtil;
 import com.yuliyuli.vo.VideoVO;
-
 import jakarta.annotation.Resource;
 import java.util.HashMap;
 import java.util.List;
@@ -113,12 +112,12 @@ public class InfoServiceImpl implements InfoService {
   @Override
   public Map<String, Object> getUserInfoByAuthorName(String authorName) {
     try {
-      User user = userMapper.selectOne(
-        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<User>()
-          .eq(User::getUsername, authorName)
-          .or()
-          .eq(User::getNickname, authorName)
-      );
+      User user =
+          userMapper.selectOne(
+              new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<User>()
+                  .eq(User::getUsername, authorName)
+                  .or()
+                  .eq(User::getNickname, authorName));
       if (user == null) {
         log.error("用户不存在,作者名字:{}", authorName);
         return null;
@@ -137,12 +136,12 @@ public class InfoServiceImpl implements InfoService {
     }
   }
 
-  public String userFollow(Long followUserId, Long fanUserId){
+  public String userFollow(Long followUserId, Long fanUserId) {
     if (!checkIsLogin()) {
       log.error("用户未登录，无法关注用户");
       return "请完成登录";
     }
-    try{
+    try {
       // 检查是否已经关注
       if (followMapper.getFollow(followUserId, fanUserId) != null) {
         log.info("用户已经关注了该用户,关注用户ID:{},粉丝用户ID:{}", followUserId, fanUserId);
@@ -154,19 +153,19 @@ public class InfoServiceImpl implements InfoService {
       rabbitTemplate.convertAndSend(
           RabbitMqConfig.FOLLOW_EXCHANGE_NAME, RabbitMqConfig.FOLLOW_ROUTING_KEY, map);
       log.info("关注用户传至mq成功,关注用户ID:{}", followUserId);
-      return "关注成功"; 
+      return "关注成功";
     } catch (Exception e) {
       log.error("关注用户传至mq失败,关注用户ID:{}", followUserId, e);
       return "关注失败,请稍后重试";
     }
   }
 
-  public String userUnfollow(Long followUserId, Long fanUserId){
+  public String userUnfollow(Long followUserId, Long fanUserId) {
     if (!checkIsLogin()) {
       log.error("用户未登录，无法取消关注用户");
       return "请完成登录";
     }
-    try{
+    try {
       Map<String, Object> map = new HashMap<>();
       map.put("followUserId", followUserId);
       map.put("fanUserId", fanUserId);
@@ -174,7 +173,7 @@ public class InfoServiceImpl implements InfoService {
       rabbitTemplate.convertAndSend(
           RabbitMqConfig.FOLLOW_EXCHANGE_NAME, RabbitMqConfig.FOLLOW_ROUTING_KEY, map);
       log.info("取消关注用户传至mq成功,关注用户ID:{}", followUserId);
-      return "取消关注成功"; 
+      return "取消关注成功";
     } catch (Exception e) {
       log.error("取消关注用户传至mq失败,关注用户ID:{}", followUserId, e);
       return "取消关注失败,请稍后重试";

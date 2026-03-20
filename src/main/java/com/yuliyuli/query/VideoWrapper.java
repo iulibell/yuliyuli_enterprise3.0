@@ -2,7 +2,6 @@ package com.yuliyuli.query;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yuliyuli.entity.Video;
-
 import org.springframework.stereotype.Component;
 
 @Component
@@ -56,9 +55,7 @@ public class VideoWrapper {
    *
    * @return LambdaQueryWrapper<Video>获取所有视频url
    */
-  public LambdaQueryWrapper<Video> getVideoUrlForBloom(){
-    return new LambdaQueryWrapper<Video>()
-      .select(Video::getUrl).eq(Video::getIsDelete, 0);
+  public LambdaQueryWrapper<Video> getVideoUrlForBloom() {
+    return new LambdaQueryWrapper<Video>().select(Video::getUrl).eq(Video::getIsDelete, 0);
   }
-
 }

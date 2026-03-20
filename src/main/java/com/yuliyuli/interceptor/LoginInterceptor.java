@@ -2,8 +2,8 @@ package com.yuliyuli.interceptor;
 
 import com.alibaba.fastjson2.JSON;
 import com.yuliyuli.common.Result;
-import com.yuliyuli.entity.User;
 import com.yuliyuli.entity.CurrentUserHolder;
+import com.yuliyuli.entity.User;
 import com.yuliyuli.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -78,14 +78,15 @@ public class LoginInterceptor implements HandlerInterceptor {
 
   /**
    * 请求处理完成后，清除用户信息
+   *
    * @param request 请求
    * @param response 响应
    * @param handler 处理程序
    * @param ex 异常
    */
   @Override
-  public void afterCompletion(HttpServletRequest request, HttpServletResponse response, 
-        Object handler, Exception e) {
+  public void afterCompletion(
+      HttpServletRequest request, HttpServletResponse response, Object handler, Exception e) {
     // 请求处理完成后，清除用户信息
     CurrentUserHolder.removeUser();
   }

@@ -54,7 +54,6 @@ public class UserWrapper {
   }
 
   public LambdaQueryWrapper<User> buildHotUserList() {
-    return new LambdaQueryWrapper<User>()
-      .lt(User::getFollowCount, 1000000);
+    return new LambdaQueryWrapper<User>().lt(User::getFollowCount, 1000000);
   }
 }

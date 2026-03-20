@@ -4,7 +4,6 @@ import com.rabbitmq.client.Channel;
 import com.yuliyuli.config.RabbitMqConfig;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import jakarta.annotation.Resource;
-
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RedissonClient;
@@ -37,8 +36,9 @@ public class VideoPlayConsumer {
       return;
     }
 
-    try{
-      redissonClient.getScoredSortedSet(DELAY_KEY)
+    try {
+      redissonClient
+          .getScoredSortedSet(DELAY_KEY)
           .add(System.currentTimeMillis() + DELAY_TIME, videoUrl);
       // 播放完成后，手动确认消息
       channel.basicAck(deliveryTag, false);
@@ -61,14 +61,16 @@ public class VideoPlayConsumer {
     }
   }
 
-   /**
+  /**
    * 处理重试
+   *
    * @param deliveryTag 消息标签
    * @param channel 通道
    * @param retryCount 重试次数
    * @param headers 消息头
    */
-  private void handleRetry(Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
+  private void handleRetry(
+      Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
     if (retryCount < MAX_RETRY_COUNT) {
       headers.put(RETRY_HEADER, retryCount + 1);
       try {

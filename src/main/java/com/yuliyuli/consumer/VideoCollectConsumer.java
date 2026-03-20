@@ -42,8 +42,11 @@ public class VideoCollectConsumer {
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
     Integer retryCount = (Integer) headers.getOrDefault(RETRY_HEADER, 0);
     // 检查视频收藏消息参数是否完整
-    if (videoCollection == null || videoCollection.getUserId() == null || videoCollection.getVideoId() == null) {
-      log.error("视频收藏消息参数错误,用户ID:{} 视频ID:{}", videoCollection.getUserId(), videoCollection.getVideoId());
+    if (videoCollection == null
+        || videoCollection.getUserId() == null
+        || videoCollection.getVideoId() == null) {
+      log.error(
+          "视频收藏消息参数错误,用户ID:{} 视频ID:{}", videoCollection.getUserId(), videoCollection.getVideoId());
       channel.basicReject(deliveryTag, false);
       return;
     }
@@ -51,48 +54,42 @@ public class VideoCollectConsumer {
     String userId = videoCollection.getUserId().toString();
     String LOCK_KEY = LOCK_KEY_PREFIX + videoId + ":" + userId;
     RLock lock = redissonClient.getLock(LOCK_KEY);
-    try{
+    try {
       boolean isLocked = lock.tryLock(LOCK_WAIT, LOCK_RELEASE, TimeUnit.SECONDS);
       if (!isLocked) {
         handleRetry(deliveryTag, channel, retryCount, headers);
-        log.info("视频收藏消息处理失败,用户ID:{} 视频ID:{} 锁未获取,已重新放入队列",
-          videoCollection.getUserId(),
-          videoCollection.getVideoId());
+        log.info(
+            "视频收藏消息处理失败,用户ID:{} 视频ID:{} 锁未获取,已重新放入队列",
+            videoCollection.getUserId(),
+            videoCollection.getVideoId());
         return;
       }
-        String counterKey = COUNTER_KEY_PREFIX + videoId;
-        String userKey = USER_KEY_PREFIX + userId;
-        RAtomicLong counter = redissonClient.getAtomicLong(counterKey);
-        RSet<String> userSet = redissonClient.getSet(userKey);
-        Long finallyCount = null;
-        //判断用户是否已收藏视频
-        if (userSet.contains(userId)) {
-          //用户已收藏视频，取消收藏
-          log.info("用户{}取消收藏视频{}，最新收藏数：{}",
-            userId,
-            videoId,
-            finallyCount);
-          userSet.remove(userId);
-          finallyCount = counter.decrementAndGet();
-          videoMapper.updateVideoCollectCount(
-            finallyCount.intValue(), videoId);
-        } else {
-          //用户未收藏视频，收藏视频
-          log.info("用户{}收藏视频{}，最新收藏数：{}",
-            userId,
-            videoId,
-            counter.incrementAndGet());
-          userSet.add(userId);
-          finallyCount = counter.incrementAndGet();
-          videoMapper.updateVideoCollectCount(finallyCount.intValue(), videoId);
-        }
+      String counterKey = COUNTER_KEY_PREFIX + videoId;
+      String userKey = USER_KEY_PREFIX + userId;
+      RAtomicLong counter = redissonClient.getAtomicLong(counterKey);
+      RSet<String> userSet = redissonClient.getSet(userKey);
+      Long finallyCount = null;
+      // 判断用户是否已收藏视频
+      if (userSet.contains(userId)) {
+        // 用户已收藏视频，取消收藏
+        log.info("用户{}取消收藏视频{}，最新收藏数：{}", userId, videoId, finallyCount);
+        userSet.remove(userId);
+        finallyCount = counter.decrementAndGet();
+        videoMapper.updateVideoCollectCount(finallyCount.intValue(), videoId);
+      } else {
+        // 用户未收藏视频，收藏视频
+        log.info("用户{}收藏视频{}，最新收藏数：{}", userId, videoId, counter.incrementAndGet());
+        userSet.add(userId);
+        finallyCount = counter.incrementAndGet();
+        videoMapper.updateVideoCollectCount(finallyCount.intValue(), videoId);
+      }
       // 收藏完成后，手动确认消息
       channel.basicAck(deliveryTag, false);
       log.info("用户{}收藏视频{}成功", userId, videoId);
     } catch (Exception e) {
       log.error("视频收藏消费者异常，重试次数:{}", retryCount, e);
       handleRetry(deliveryTag, channel, retryCount, headers);
-    }finally {
+    } finally {
       if (lock != null && lock.isHeldByCurrentThread()) {
         lock.unlock();
       }
@@ -107,19 +104,25 @@ public class VideoCollectConsumer {
     try {
       channel.basicAck(diliverTag, false);
     } catch (Exception e) {
-      log.error("死信队列丢弃收藏失败,用户ID:{} 视频ID:{}", videoCollection.getUserId(), videoCollection.getVideoId(), e);
+      log.error(
+          "死信队列丢弃收藏失败,用户ID:{} 视频ID:{}",
+          videoCollection.getUserId(),
+          videoCollection.getVideoId(),
+          e);
       throw new GlobalExceptionHandler.BusinessException("死信队列丢弃收藏失败");
     }
   }
 
   /**
    * 处理重试
+   *
    * @param deliveryTag 消息标签
    * @param channel 通道
    * @param retryCount 重试次数
    * @param headers 消息头
    */
-  private void handleRetry(Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
+  private void handleRetry(
+      Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
     if (retryCount < MAX_RETRY_COUNT) {
       headers.put(RETRY_HEADER, retryCount + 1);
       try {

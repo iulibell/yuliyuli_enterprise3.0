@@ -8,11 +8,6 @@ import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.mapper.CommentMapper;
 import com.yuliyuli.mapper.VideoMapper;
 import com.yuliyuli.query.VideoWrapper;
-import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
-import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
-import org.springframework.data.elasticsearch.core.query.UpdateQuery;
-import org.springframework.data.elasticsearch.core.query.ScriptType;
-
 import jakarta.annotation.Resource;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -21,6 +16,10 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
+import org.springframework.data.elasticsearch.core.query.ScriptType;
+import org.springframework.data.elasticsearch.core.query.UpdateQuery;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -51,12 +50,12 @@ public class CommentConsumer {
     log.info("进入评论消费者");
     Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     // 参数校验
-    if(comment == null || comment.getVideoId() == null || comment.getUserId() == null) {
+    if (comment == null || comment.getVideoId() == null || comment.getUserId() == null) {
       channel.basicReject(deliveryTag, false);
       log.warn("评论消息为空,在评论消费者丢弃");
       return;
     }
-    //重试次数,从消息头中获取重试次数,如果没有则默认0
+    // 重试次数,从消息头中获取重试次数,如果没有则默认0
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
     Integer retryCount = (Integer) headers.getOrDefault(RETRY_HEADER, 0);
     // 锁: 每个用户评论时,加锁,防止并发评论
@@ -98,6 +97,7 @@ public class CommentConsumer {
 
   /**
    * 更新视频评论数到ES
+   *
    * @param videoUrl 视频URL
    */
   private void updateCommentCountToES(String videoUrl) {
@@ -107,9 +107,10 @@ public class CommentConsumer {
     try {
       // 定义核心参数（文档ID直接用videoUrl，无需替换特殊字符，ES支持特殊字符作为文档ID）
       String docId = videoUrl; // 要更新的ES文档ID
-      String scriptSource = "ctx._source.commentCount = (ctx._source.commentCount ?: 0) + 1"; // 原子更新脚本
+      String scriptSource =
+          "ctx._source.commentCount = (ctx._source.commentCount ?: 0) + 1"; // 原子更新脚本
       // 构建 UpdateQuery（适配所有 Spring Data Elasticsearch 版本的通用写法）
-      UpdateQuery updateQuery = 
+      UpdateQuery updateQuery =
           UpdateQuery.builder(docId)
               .withScript(scriptSource) // 传入内联脚本内容（字符串）
               .withScriptType(ScriptType.INLINE) // 明确指定脚本类型为内联（关键！）
@@ -127,6 +128,7 @@ public class CommentConsumer {
 
   /**
    * 死信队列（记录+警告）
+   *
    * @param comment
    * @param channel
    * @param mqMessage
@@ -147,12 +149,14 @@ public class CommentConsumer {
 
   /**
    * 处理重试
+   *
    * @param deliveryTag 消息标签
    * @param channel 通道
    * @param retryCount 重试次数
    * @param headers 消息头
    */
-  private void handleRetry(Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
+  private void handleRetry(
+      Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
     if (retryCount < MAX_RETRY_COUNT) {
       headers.put(RETRY_HEADER, retryCount + 1);
       try {

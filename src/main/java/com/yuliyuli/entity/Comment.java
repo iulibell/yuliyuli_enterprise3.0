@@ -22,7 +22,7 @@ public class Comment {
 
   @TableField("avatar")
   @Parameter(name = "评论用户头像")
-   private String avatar;
+  private String avatar;
 
   @TableField("username")
   @Parameter(name = "评论用户昵称")

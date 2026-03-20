@@ -6,9 +6,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * 限流注解
- * 用于在Controller方法上添加限流功能，限制单位时间内的请求次数
- * 
+ * 限流注解 用于在Controller方法上添加限流功能，限制单位时间内的请求次数
+ *
  * @author yuliyuli
  * @date 2024-03-20
  * @param limit 限制次数

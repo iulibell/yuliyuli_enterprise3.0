@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yuliyuli.annotation.RateLimit;
 import com.yuliyuli.common.Result;
 import com.yuliyuli.entity.Comment;
-import com.yuliyuli.entity.User;
 import com.yuliyuli.entity.CurrentUserHolder;
+import com.yuliyuli.entity.User;
 import com.yuliyuli.entity.VideoCollection;
 import com.yuliyuli.entity.VideoDeliveryWithoutFile;
 import com.yuliyuli.entity.VideoLike;
@@ -19,7 +19,6 @@ import com.yuliyuli.util.TransferUtil;
 import com.yuliyuli.vo.HotRecommendVideoVO;
 import com.yuliyuli.vo.SearchVideoVO;
 import com.yuliyuli.vo.VideoVO;
-
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,9 +26,7 @@ import jakarta.annotation.Resource;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.validation.annotation.Validated;
@@ -53,10 +50,12 @@ import org.springframework.web.multipart.MultipartFile;
 @Slf4j
 public class VideoController {
 
-  @Value("${upload.videopath:C\\\\Users\\\\Administrator\\\\Desktop\\\\yuliyuli_enterprise\\\\yuliyuli-frontend\\\\static\\\\videoUrl}")
+  @Value(
+      "${upload.videopath:C\\\\Users\\\\Administrator\\\\Desktop\\\\yuliyuli_enterprise\\\\yuliyuli-frontend\\\\static\\\\videoUrl}")
   private String VIDEOIR;
 
-  @Value("${upload.coverPath:C\\\\Users\\\\Administrator\\\\Desktop\\\\yuliyuli_enterprise\\\\yuliyuli-frontend\\\\static\\\\coverUrl}")
+  @Value(
+      "${upload.coverPath:C\\\\Users\\\\Administrator\\\\Desktop\\\\yuliyuli_enterprise\\\\yuliyuli-frontend\\\\static\\\\coverUrl}")
   private String COVERDIR;
 
   @Resource private CommentMapper commentMapper;
@@ -105,10 +104,10 @@ public class VideoController {
       if (currentUser == null) {
         return Result.fail("请完成登录");
       }
-      
+
       // 保存视频文件，使用视频ID作为文件名
       String videoPath = transferUtil.uploadVideo(file, VIDEOIR);
-      
+
       // 保存封面文件，使用视频ID作为文件名
       String coverPath = transferUtil.uploadVideoCover(cover, COVERDIR);
       // 传递视频信息到服务层
@@ -164,7 +163,7 @@ public class VideoController {
     try {
       String message = videoService.videoCollect(videoCollect);
       log.info("视频收藏成功,视频ID:{},用户ID:{}", videoCollect.getVideoId(), videoCollect.getUserId());
-      return Result.success(message); 
+      return Result.success(message);
     } catch (Exception e) {
       log.error("视频收藏失败", e);
       return Result.fail("视频收藏失败,请稍后重试");
@@ -248,36 +247,36 @@ public class VideoController {
       @Parameter(description = "粉丝用户ID") @RequestParam Long fanUserId,
       @Parameter(description = "上一页最后一条评论的id") @RequestParam(required = false) Long lastId) {
     // 先对热门视频进行播放计数，再返回相关视频
-      if (redisTemplate.opsForValue().get(videoUrl) != null) {
-        videoService.hotVideoPlay(videoUrl);
-        // 返回的右侧热门推荐视频栏
-        List<HotRecommendVideoVO> hotVideoVOList = videoService.getRecommendHotVideo();
-        // 分页获取评论列表
-        Page<Comment> commentPage = new Page<>(1, 10);
-        commentMapper.selectPage(
-            commentPage, commentWrapper.getCommentListByCursor(videoUrl, lastId, 10));
-        Map<String, Object> response = new HashMap<>();
-        response.put("hotVideoVOList", hotVideoVOList);
-        // 传递评论列表
-        response.put("commentList", commentPage.getRecords());
-        response.put("isFollow", followMapper.getFollow(followUserId, fanUserId) != null);
-        return Result.success(response);
-      } else {
-        // 先对视频进行播放计数，再返回相关视频
-        videoService.videoPlay(videoUrl);
-        // 返回的右侧热门推荐视频栏
-        List<HotRecommendVideoVO> hotVideoVOList = videoService.getRecommendHotVideo();
-        // 分页获取评论列表
-        Page<Comment> commentPage = new Page<>(1, 10);
-        commentMapper.selectPage(
-            commentPage, commentWrapper.getCommentListByCursor(videoUrl, lastId, 10));
-        Map<String, Object> response = new HashMap<>();
-        response.put("hotVideoVOList", hotVideoVOList);
-        // 传递评论列表
-        response.put("commentList", commentPage.getRecords());
-        response.put("isFollow", followMapper.getFollow(followUserId, fanUserId) != null);
-        return Result.success(response);
-      }
+    if (redisTemplate.opsForValue().get(videoUrl) != null) {
+      videoService.hotVideoPlay(videoUrl);
+      // 返回的右侧热门推荐视频栏
+      List<HotRecommendVideoVO> hotVideoVOList = videoService.getRecommendHotVideo();
+      // 分页获取评论列表
+      Page<Comment> commentPage = new Page<>(1, 10);
+      commentMapper.selectPage(
+          commentPage, commentWrapper.getCommentListByCursor(videoUrl, lastId, 10));
+      Map<String, Object> response = new HashMap<>();
+      response.put("hotVideoVOList", hotVideoVOList);
+      // 传递评论列表
+      response.put("commentList", commentPage.getRecords());
+      response.put("isFollow", followMapper.getFollow(followUserId, fanUserId) != null);
+      return Result.success(response);
+    } else {
+      // 先对视频进行播放计数，再返回相关视频
+      videoService.videoPlay(videoUrl);
+      // 返回的右侧热门推荐视频栏
+      List<HotRecommendVideoVO> hotVideoVOList = videoService.getRecommendHotVideo();
+      // 分页获取评论列表
+      Page<Comment> commentPage = new Page<>(1, 10);
+      commentMapper.selectPage(
+          commentPage, commentWrapper.getCommentListByCursor(videoUrl, lastId, 10));
+      Map<String, Object> response = new HashMap<>();
+      response.put("hotVideoVOList", hotVideoVOList);
+      // 传递评论列表
+      response.put("commentList", commentPage.getRecords());
+      response.put("isFollow", followMapper.getFollow(followUserId, fanUserId) != null);
+      return Result.success(response);
+    }
   }
 
   /**

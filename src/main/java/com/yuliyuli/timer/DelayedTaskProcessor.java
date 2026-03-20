@@ -6,7 +6,6 @@ import com.yuliyuli.mapper.FollowMapper;
 import com.yuliyuli.mapper.VideoLikeMapper;
 import com.yuliyuli.mapper.VideoMapper;
 import com.yuliyuli.query.VideoLikeWrapper;
-
 import jakarta.annotation.Resource;
 import java.util.Collection;
 import java.util.Map;
@@ -90,40 +89,40 @@ public class DelayedTaskProcessor {
     String videoId = videoLike.getVideoId().toString();
 
     try {
-        RAtomicLong counter = redissonClient.getAtomicLong(counterKey);
-        RSet<Long> userSet = redissonClient.getSet(userKey);
-        boolean isLikedInCache = userSet.contains(userId);
+      RAtomicLong counter = redissonClient.getAtomicLong(counterKey);
+      RSet<Long> userSet = redissonClient.getSet(userKey);
+      boolean isLikedInCache = userSet.contains(userId);
 
-        // 缓存里有点赞 → 执行 取消点赞
-        if (isLikedInCache) {
-            userSet.remove(userId);        // 删缓存
-            counter.decrementAndGet();     // 计数 -1
-            videoMapper.deleteVideoLike(videoId, userId); // 删DB点赞记录
-            log.info("取消点赞：用户{}，视频{}", userId, videoId);
-        }
-        // 缓存没点赞，但DB有点赞记录 → 也执行 取消点赞
-        else if (videoLikeMapper.selectOne(videoLikeWrapper.getVideoLike(videoId, userId)) != null) {
-            counter.decrementAndGet();
-            videoMapper.deleteVideoLike(videoId, userId);
-            log.info("取消点赞(DB存在)：用户{}，视频{}", userId, videoId);
-        }
-        // 既没缓存也没DB → 执行 点赞
-        else {
-            userSet.add(userId);          // 加缓存
-            counter.incrementAndGet();    // 计数 +1
-            videoMapper.insertVideoLike(videoLike); // 加DB点赞记录
-            log.info("添加点赞：用户{}，视频{}", userId, videoId);
-        }
+      // 缓存里有点赞 → 执行 取消点赞
+      if (isLikedInCache) {
+        userSet.remove(userId); // 删缓存
+        counter.decrementAndGet(); // 计数 -1
+        videoMapper.deleteVideoLike(videoId, userId); // 删DB点赞记录
+        log.info("取消点赞：用户{}，视频{}", userId, videoId);
+      }
+      // 缓存没点赞，但DB有点赞记录 → 也执行 取消点赞
+      else if (videoLikeMapper.selectOne(videoLikeWrapper.getVideoLike(videoId, userId)) != null) {
+        counter.decrementAndGet();
+        videoMapper.deleteVideoLike(videoId, userId);
+        log.info("取消点赞(DB存在)：用户{}，视频{}", userId, videoId);
+      }
+      // 既没缓存也没DB → 执行 点赞
+      else {
+        userSet.add(userId); // 加缓存
+        counter.incrementAndGet(); // 计数 +1
+        videoMapper.insertVideoLike(videoLike); // 加DB点赞记录
+        log.info("添加点赞：用户{}，视频{}", userId, videoId);
+      }
 
-        // 核心修复：把 Redis 计数 同步到 DB
-        long changeCount = counter.getAndSet(0);
-        if (changeCount != 0) {
-            // 调用你已有的 SQL：like_count = like_count + #{addCount}
-            videoMapper.addVideoLikeCount(changeCount, videoId);
-        }
+      // 核心修复：把 Redis 计数 同步到 DB
+      long changeCount = counter.getAndSet(0);
+      if (changeCount != 0) {
+        // 调用你已有的 SQL：like_count = like_count + #{addCount}
+        videoMapper.addVideoLikeCount(changeCount, videoId);
+      }
 
     } catch (Exception e) {
-        log.error("处理延时点赞失败: {}", videoLike, e);
+      log.error("处理延时点赞失败: {}", videoLike, e);
     }
   }
 
@@ -198,7 +197,8 @@ public class DelayedTaskProcessor {
   protected void processDelayDelete() {
     long currentTime = System.currentTimeMillis();
     // 从有序集合获取所有到期的 videoUrl
-    RScoredSortedSet<Map<String, Object>> sortedSet = redissonClient.getScoredSortedSet(DELETE_DELAY_KEY);
+    RScoredSortedSet<Map<String, Object>> sortedSet =
+        redissonClient.getScoredSortedSet(DELETE_DELAY_KEY);
     Collection<Map<String, Object>> expiredVideoUrls =
         sortedSet.entryRange(0, true, currentTime, true).stream()
             .map(entry -> entry.getValue())
@@ -269,103 +269,104 @@ public class DelayedTaskProcessor {
 
   // 处理延时关注同步到数据库
   @Scheduled(fixedRate = 5000) // 每5秒检查一次
-    public void processFollow() {
-        try {
-            RScoredSortedSet<Map<String, Object>> sortedSet = redissonClient.getScoredSortedSet(FOLLOW_DELAY_KEY);
-            long now = System.currentTimeMillis();
+  public void processFollow() {
+    try {
+      RScoredSortedSet<Map<String, Object>> sortedSet =
+          redissonClient.getScoredSortedSet(FOLLOW_DELAY_KEY);
+      long now = System.currentTimeMillis();
 
-            // 每次最多拉取 200 条，防止OOM
-            Collection<ScoredEntry<Map<String, Object>>> entries =
-                    sortedSet.entryRange(0, true, now, true, 0, 200);
+      // 每次最多拉取 200 条，防止OOM
+      Collection<ScoredEntry<Map<String, Object>>> entries =
+          sortedSet.entryRange(0, true, now, true, 0, 200);
 
-            for (ScoredEntry<Map<String, Object>> entry : entries) {
-                Map<String, Object> task = entry.getValue();
-                boolean removed = sortedSet.remove(task);
-                if (!removed) {
-                    // 已被其他线程处理，跳过
-                    continue;
-                }
-
-                try {
-                    doProcess(task);
-                } catch (Exception e) {
-                    log.error("处理关注任务失败: {}", task, e);
-                }
-            }
-
-        } catch (Exception e) {
-            log.error("延时任务执行异常", e);
-        }
-    }
-
-    // 真正处理关注逻辑
-    private void doProcess(Map<String, Object> map) {
-        String operation = map.getOrDefault("operation", "follow").toString();
-        Object fanUserIdObj = map.get("fanUserId");
-        Object followUserIdObj = map.get("followUserId");
-
-        if (fanUserIdObj == null || followUserIdObj == null) {
-            log.error("任务数据不完整: {}", map);
-            return;
+      for (ScoredEntry<Map<String, Object>> entry : entries) {
+        Map<String, Object> task = entry.getValue();
+        boolean removed = sortedSet.remove(task);
+        if (!removed) {
+          // 已被其他线程处理，跳过
+          continue;
         }
 
         try {
-            long fanUserId = Long.parseLong(fanUserIdObj.toString());
-            long followUserId = Long.parseLong(followUserIdObj.toString());
-            String hotUserKey = "user:hot:" + followUserId;
-            RScoredSortedSet<Long> hotUserSet = redissonClient.getScoredSortedSet(hotUserKey);
-
-            // 判断是否是热门用户：看缓存是否存在
-            boolean isHotUser = !hotUserSet.isEmpty();
-
-            if ("unfollow".equals(operation)) {
-                handleUnfollow(fanUserId, followUserId, hotUserSet, isHotUser);
-            } else {
-                handleFollow(fanUserId, followUserId, hotUserSet, isHotUser);
-            }
-
+          doProcess(task);
         } catch (Exception e) {
-            log.error("处理任务异常: {}", map, e);
+          log.error("处理关注任务失败: {}", task, e);
         }
+      }
+
+    } catch (Exception e) {
+      log.error("延时任务执行异常", e);
+    }
+  }
+
+  // 真正处理关注逻辑
+  private void doProcess(Map<String, Object> map) {
+    String operation = map.getOrDefault("operation", "follow").toString();
+    Object fanUserIdObj = map.get("fanUserId");
+    Object followUserIdObj = map.get("followUserId");
+
+    if (fanUserIdObj == null || followUserIdObj == null) {
+      log.error("任务数据不完整: {}", map);
+      return;
     }
 
-    // 关注逻辑
-    private void handleFollow(long fanUserId, long followUserId,
-                              RScoredSortedSet<Long> hotUserSet, boolean isHotUser) {
-        // 幂等：不存在才插入
-        if (followMapper.getFollow(followUserId, fanUserId) == null) {
-            followMapper.insertFollow(followUserId, fanUserId);
-            followMapper.updateFansCount(followUserId);
+    try {
+      long fanUserId = Long.parseLong(fanUserIdObj.toString());
+      long followUserId = Long.parseLong(followUserIdObj.toString());
+      String hotUserKey = "user:hot:" + followUserId;
+      RScoredSortedSet<Long> hotUserSet = redissonClient.getScoredSortedSet(hotUserKey);
 
-            if (isHotUser) {
-                hotUserSet.add(System.currentTimeMillis(), fanUserId);
-                log.info("关注热门UP主成功: fan={}, up={}", fanUserId, followUserId);
-            } else {
-                log.info("关注普通UP主成功: fan={}, up={}", fanUserId, followUserId);
-            }
-        }
+      // 判断是否是热门用户：看缓存是否存在
+      boolean isHotUser = !hotUserSet.isEmpty();
+
+      if ("unfollow".equals(operation)) {
+        handleUnfollow(fanUserId, followUserId, hotUserSet, isHotUser);
+      } else {
+        handleFollow(fanUserId, followUserId, hotUserSet, isHotUser);
+      }
+
+    } catch (Exception e) {
+      log.error("处理任务异常: {}", map, e);
     }
+  }
 
-    // 取消关注逻辑
-    private void handleUnfollow(long fanUserId, long followUserId,
-                                RScoredSortedSet<Long> hotUserSet, boolean isHotUser) {
-        if (followMapper.getFollow(followUserId, fanUserId) != null) {
-            followMapper.deleteFollow(followUserId, fanUserId);
-            followMapper.decrementFansCount(followUserId);
+  // 关注逻辑
+  private void handleFollow(
+      long fanUserId, long followUserId, RScoredSortedSet<Long> hotUserSet, boolean isHotUser) {
+    // 幂等：不存在才插入
+    if (followMapper.getFollow(followUserId, fanUserId) == null) {
+      followMapper.insertFollow(followUserId, fanUserId);
+      followMapper.updateFansCount(followUserId);
 
-            if (isHotUser) {
-                hotUserSet.remove(fanUserId);
-                log.info("取消热门UP主关注: fan={}, up={}", fanUserId, followUserId);
-            } else {
-                log.info("取消普通UP主关注: fan={}, up={}", fanUserId, followUserId);
-            }
-        }
+      if (isHotUser) {
+        hotUserSet.add(System.currentTimeMillis(), fanUserId);
+        log.info("关注热门UP主成功: fan={}, up={}", fanUserId, followUserId);
+      } else {
+        log.info("关注普通UP主成功: fan={}, up={}", fanUserId, followUserId);
+      }
     }
+  }
+
+  // 取消关注逻辑
+  private void handleUnfollow(
+      long fanUserId, long followUserId, RScoredSortedSet<Long> hotUserSet, boolean isHotUser) {
+    if (followMapper.getFollow(followUserId, fanUserId) != null) {
+      followMapper.deleteFollow(followUserId, fanUserId);
+      followMapper.decrementFansCount(followUserId);
+
+      if (isHotUser) {
+        hotUserSet.remove(fanUserId);
+        log.info("取消热门UP主关注: fan={}, up={}", fanUserId, followUserId);
+      } else {
+        log.info("取消普通UP主关注: fan={}, up={}", fanUserId, followUserId);
+      }
+    }
+  }
 
   // 处理延时视频删除同步到数据库
   @Scheduled(fixedRate = 10000) // 每10秒检查一次
   @Async
-  protected void processDeleteIsDelete(){
+  protected void processDeleteIsDelete() {
     try {
       int deletedCount = videoMapper.deleteVideoIsDelete();
       if (deletedCount > 0) {
@@ -385,7 +386,7 @@ public class DelayedTaskProcessor {
       String docId = videoUrl; // 要更新的ES文档ID
       String scriptSource = "ctx._source.playCount = (ctx._source.playCount ?: 0) + 1"; // 原子更新脚本
       // 构建 UpdateQuery（适配所有 Spring Data Elasticsearch 版本的通用写法）
-      UpdateQuery updateQuery = 
+      UpdateQuery updateQuery =
           UpdateQuery.builder(docId)
               .withScript(scriptSource) // 传入内联脚本内容（字符串）
               .withScriptType(ScriptType.INLINE) // 明确指定脚本类型为内联（关键！）
@@ -424,12 +425,12 @@ public class DelayedTaskProcessor {
   }
 
   // 处理延时视频播放的公用方法
-  private void playCommonProcess(String videoUrl, String counterKey){
-      // 计数器，记录播放次数
-      RAtomicLong counter = redissonClient.getAtomicLong(counterKey);
-      counter.incrementAndGet();
-      processPlayCountToES(videoUrl);
-      videoMapper.addVideoPlayCount(1, videoUrl);
-      log.info("延时处理视频播放：视频{}", videoUrl);
+  private void playCommonProcess(String videoUrl, String counterKey) {
+    // 计数器，记录播放次数
+    RAtomicLong counter = redissonClient.getAtomicLong(counterKey);
+    counter.incrementAndGet();
+    processPlayCountToES(videoUrl);
+    videoMapper.addVideoPlayCount(1, videoUrl);
+    log.info("延时处理视频播放：视频{}", videoUrl);
   }
 }

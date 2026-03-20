@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yuliyuli.config.RabbitMqConfig;
 import com.yuliyuli.document.VideoDocument;
 import com.yuliyuli.entity.Comment;
-import com.yuliyuli.entity.User;
 import com.yuliyuli.entity.CurrentUserHolder;
+import com.yuliyuli.entity.User;
 import com.yuliyuli.entity.Video;
 import com.yuliyuli.entity.VideoCollection;
 import com.yuliyuli.entity.VideoDeliveryWithoutFile;
@@ -23,7 +23,6 @@ import com.yuliyuli.util.VideoConvertUtil;
 import com.yuliyuli.vo.HotRecommendVideoVO;
 import com.yuliyuli.vo.SearchVideoVO;
 import com.yuliyuli.vo.VideoVO;
-
 import jakarta.annotation.Resource;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -32,7 +31,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBucket;
 import org.redisson.api.RLock;
@@ -73,17 +71,17 @@ public class VideoServiceImpl implements VideoService {
    */
   @Override
   public String videoDeliver(VideoDeliveryWithoutFile videoDelivery) {
-      User user = CurrentUserHolder.getUser();
-      if (user == null) {
-        return "请完成登录";
-      }
-      try {
-        rabbitTemplate.convertAndSend(RabbitMqConfig.VIDEO_QUEUE_NAME, videoDelivery);
-        return "视频分发成功";
-      } catch (Exception e) {
-        log.error("视频分发失败", e);
-        return "视频分发失败";
-      }
+    User user = CurrentUserHolder.getUser();
+    if (user == null) {
+      return "请完成登录";
+    }
+    try {
+      rabbitTemplate.convertAndSend(RabbitMqConfig.VIDEO_QUEUE_NAME, videoDelivery);
+      return "视频分发成功";
+    } catch (Exception e) {
+      log.error("视频分发失败", e);
+      return "视频分发失败";
+    }
   }
 
   /**
@@ -93,20 +91,20 @@ public class VideoServiceImpl implements VideoService {
    */
   @Override
   public String videoLike(VideoLike videoLike) {
-      User user = CurrentUserHolder.getUser();
-      if (user == null) {
-        return "请完成登录";
+    User user = CurrentUserHolder.getUser();
+    if (user == null) {
+      return "请完成登录";
+    }
+    try {
+      if (!bloomFilterUtil.checkVideoExists(videoLike.getVideoId())) {
+        return "视频不存在";
       }
-      try {
-        if(!bloomFilterUtil.checkVideoExists(videoLike.getVideoId())){
-          return "视频不存在";
-        }
-        rabbitTemplate.convertAndSend(RabbitMqConfig.LIKE_QUEUE_NAME, videoLike);
-        return "点赞成功";
-      } catch (Exception e) {
-        log.error("视频点赞失败", e);
-        return "视频点赞失败";
-      }
+      rabbitTemplate.convertAndSend(RabbitMqConfig.LIKE_QUEUE_NAME, videoLike);
+      return "点赞成功";
+    } catch (Exception e) {
+      log.error("视频点赞失败", e);
+      return "视频点赞失败";
+    }
   }
 
   /**
@@ -119,11 +117,11 @@ public class VideoServiceImpl implements VideoService {
     User user = CurrentUserHolder.getUser();
     if (user == null) {
       return "请完成登录";
-    }   
+    }
     threadPoolExecutor.submit(
         () -> {
           try {
-            if(!bloomFilterUtil.checkVideoExists(videoCollection.getVideoId())){
+            if (!bloomFilterUtil.checkVideoExists(videoCollection.getVideoId())) {
               return "视频不存在";
             }
             rabbitTemplate.convertAndSend(RabbitMqConfig.COLLECT_QUEUE_NAME, videoCollection);
@@ -133,7 +131,7 @@ public class VideoServiceImpl implements VideoService {
             return "视频收藏失败";
           }
         });
-        return "";
+    return "";
   }
 
   /**
@@ -144,14 +142,14 @@ public class VideoServiceImpl implements VideoService {
   @Override
   public String videoComment(Comment comment) {
     User user = CurrentUserHolder.getUser();
-      if (user == null) {
-        return "请完成登录";
-      }
+    if (user == null) {
+      return "请完成登录";
+    }
     threadPoolExecutor.submit(
         () -> {
           log.info("进入视频评论线程池");
           try {
-            if(!bloomFilterUtil.checkVideoExists(comment.getVideoId())){
+            if (!bloomFilterUtil.checkVideoExists(comment.getVideoId())) {
               return "视频不存在";
             }
             rabbitTemplate.convertAndSend(RabbitMqConfig.COMMENT_QUEUE_NAME, comment);
@@ -161,7 +159,7 @@ public class VideoServiceImpl implements VideoService {
             return "视频评论失败";
           }
         });
-        return "";
+    return "";
   }
 
   /**
@@ -171,7 +169,7 @@ public class VideoServiceImpl implements VideoService {
    */
   @Override
   public String hotVideoPlay(String videoUrl) {
-    if(!bloomFilterUtil.checkVideoExists(videoUrl)){
+    if (!bloomFilterUtil.checkVideoExists(videoUrl)) {
       return "视频不存在";
     }
     threadPoolExecutor.submit(
@@ -185,7 +183,7 @@ public class VideoServiceImpl implements VideoService {
             return "视频播放失败";
           }
         });
-        return "";
+    return "";
   }
 
   /**
@@ -195,7 +193,7 @@ public class VideoServiceImpl implements VideoService {
    */
   @Override
   public String videoPlay(String videoUrl) {
-    if(!bloomFilterUtil.checkVideoExists(videoUrl)){
+    if (!bloomFilterUtil.checkVideoExists(videoUrl)) {
       return "视频不存在";
     }
     threadPoolExecutor.submit(
@@ -208,7 +206,7 @@ public class VideoServiceImpl implements VideoService {
             return "视频播放失败";
           }
         });
-        return "";
+    return "";
   }
 
   /*=======================================================👇get方法============================================================= */
@@ -336,20 +334,20 @@ public class VideoServiceImpl implements VideoService {
   public List<HotRecommendVideoVO> getRecommendHotVideo() {
     log.info("开始获取推荐热门视频");
     // 1. 从ZSet获取前15个视频文档（按播放量降序）
-    Set<Object> top15Videos = 
+    Set<Object> top15Videos =
         redisTemplate.opsForZSet().reverseRange(SearchVideoInit.HOT_ALL_KEY, 0, 14);
-    
+
     log.info("从ZSet获取的视频数量: {}", top15Videos != null ? top15Videos.size() : 0);
 
     // 2. 批量获取视频详细信息
     List<VideoDocument> hotVideoList = new ArrayList<>();
     ObjectMapper objectMapper = new ObjectMapper();
-    
+
     if (top15Videos != null && !top15Videos.isEmpty()) {
       for (Object videoObj : top15Videos) {
         try {
           VideoDocument videoDocument = null;
-          
+
           // 处理不同类型的数据
           if (videoObj instanceof VideoDocument) {
             // 直接是VideoDocument对象
@@ -361,7 +359,7 @@ public class VideoServiceImpl implements VideoService {
             // JSON字符串，需要解析
             videoDocument = objectMapper.readValue((String) videoObj, VideoDocument.class);
           }
-          
+
           if (videoDocument != null) {
             hotVideoList.add(videoDocument);
             log.info("添加视频到推荐列表: {}", videoDocument.getTitle());
@@ -375,7 +373,7 @@ public class VideoServiceImpl implements VideoService {
     } else {
       log.warn("ZSet中没有视频数据: {}", SearchVideoInit.HOT_ALL_KEY);
     }
-    
+
     log.info("获取推荐热门视频成功，数量: {}", hotVideoList.size());
     return VideoConvertUtil.convertVideoDocumentToHotRecommendVideoVO(hotVideoList);
   }

@@ -34,12 +34,7 @@ public class RateLimiterUtil {
             + "end";
 
     DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>(luaScript, Long.class);
-    Long result =
-        redisTemplate.execute(
-            redisScript,
-            Collections.singletonList(key),
-            limit,
-            window);
+    Long result = redisTemplate.execute(redisScript, Collections.singletonList(key), limit, window);
 
     return result != null && result == 1;
   }

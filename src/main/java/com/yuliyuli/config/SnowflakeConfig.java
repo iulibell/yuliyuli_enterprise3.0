@@ -8,17 +8,14 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SnowflakeConfig {
 
-  /**
-   * 工作节点ID
-   */
+  /** 工作节点ID */
   @Value("${snowflake.worker-id:1}")
   private Long workId;
-  /**
-   * 数据中心ID
-   */ 
+
+  /** 数据中心ID */
   @Value("${snowflake.datacenter-id:1}")
-    private Long datacenterId;
-    
+  private Long datacenterId;
+
   @Bean
   public SnowflakeIdGenerator snowflakeIdGenerator() {
     return new SnowflakeIdGenerator(workId, datacenterId);

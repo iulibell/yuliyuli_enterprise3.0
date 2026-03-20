@@ -6,7 +6,6 @@ import com.yuliyuli.exception.GlobalExceptionHandler;
 import jakarta.annotation.Resource;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -29,43 +28,43 @@ public class HotVideoPlayConsumer {
   @Resource private RedissonClient redissonClient;
 
   @RabbitListener(queues = RabbitMqConfig.HOT_PLAY_QUEUE_NAME)
-  public void videoPlay(String videoUrl, Channel channel, Message mqMessage) 
-    throws Exception {
+  public void videoPlay(String videoUrl, Channel channel, Message mqMessage) throws Exception {
 
     Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     // 从消息头中获取重试次数,如果没有则默认0
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
     Integer retryCount = (Integer) headers.getOrDefault(RETRY_HEADER, 0);
-    //参数校验
+    // 参数校验
     if (videoUrl == null) {
       log.error("视频URL为空");
       channel.basicReject(deliveryTag, false);
       return;
     }
-      final String LOCK_KEY = LOCK_KEY_PREFIX + videoUrl;
-      RLock lock = redissonClient.getLock(LOCK_KEY);
-    try{
-      //获取视频播放锁
+    final String LOCK_KEY = LOCK_KEY_PREFIX + videoUrl;
+    RLock lock = redissonClient.getLock(LOCK_KEY);
+    try {
+      // 获取视频播放锁
       boolean isLock = lock.tryLock(LOCK_WAIT, LOCK_RELEASE, TimeUnit.SECONDS);
       if (!isLock) {
         log.error("热门视频播放锁获取失败");
         channel.basicNack(deliveryTag, false, true);
         return;
       }
-        //放入延时有序集合
-        redissonClient.getScoredSortedSet(DELAY_KEY)
-            .add(System.currentTimeMillis() + DELAY_TIME, videoUrl);
-        // 播放完成后，手动确认消息
-        channel.basicAck(deliveryTag, false);
-        log.info("热门视频播放成功,视频URL:{}", videoUrl);
-    }catch (Exception e){
+      // 放入延时有序集合
+      redissonClient
+          .getScoredSortedSet(DELAY_KEY)
+          .add(System.currentTimeMillis() + DELAY_TIME, videoUrl);
+      // 播放完成后，手动确认消息
+      channel.basicAck(deliveryTag, false);
+      log.info("热门视频播放成功,视频URL:{}", videoUrl);
+    } catch (Exception e) {
       log.error("热门视频播放消费异常,retry={}", retryCount, e);
       handleRetry(deliveryTag, channel, retryCount, headers);
-    }finally {
-        if (lock.isHeldByCurrentThread()) {
-          lock.unlock();
-        }
+    } finally {
+      if (lock.isHeldByCurrentThread()) {
+        lock.unlock();
       }
+    }
   }
 
   @RabbitListener(queues = RabbitMqConfig.HOT_PLAY_DEAD_QUEUE_NAME)
@@ -82,12 +81,14 @@ public class HotVideoPlayConsumer {
 
   /**
    * 处理重试
+   *
    * @param deliveryTag 消息标签
    * @param channel 通道
    * @param retryCount 重试次数
    * @param headers 消息头
    */
-  private void handleRetry(Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
+  private void handleRetry(
+      Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
     if (retryCount < MAX_RETRY_COUNT) {
       headers.put(RETRY_HEADER, retryCount + 1);
       try {

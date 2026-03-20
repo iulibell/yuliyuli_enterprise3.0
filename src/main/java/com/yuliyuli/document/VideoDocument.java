@@ -54,11 +54,11 @@ public class VideoDocument {
 
   @Field(type = FieldType.Date)
   private Date createTime;
-  
+
   // 视频介绍
   @Field(type = FieldType.Text)
   private String intro;
-  
+
   // 作者头像
   @Field(type = FieldType.Text)
   private String authorAvatar;

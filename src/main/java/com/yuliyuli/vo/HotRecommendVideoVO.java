@@ -1,7 +1,6 @@
 package com.yuliyuli.vo;
 
 import java.util.Date;
-
 import lombok.Data;
 
 @Data

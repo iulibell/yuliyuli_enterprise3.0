@@ -16,9 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import java.util.HashMap;
 import java.util.Map;
-
 import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.validation.annotation.Validated;
@@ -29,17 +27,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * 用户控制器
- * 提供用户登录、校验、注册等接口，校验已在业务层实现
- */
+/** 用户控制器 提供用户登录、校验、注册等接口，校验已在业务层实现 */
 @RestController
 @RequestMapping("/api/user")
 @Tag(name = "用户模块")
 @Slf4j
 public class UserController {
 
-  @Value("${upload.avatarPath:C\\\\\\\\Users\\\\\\\\Administrator\\\\\\\\Desktop\\\\\\\\yuliyuli_enterprise\\\\\\\\yuliyuli-frontend\\\\\\\\static\\\\\\\\avatarUrl}")
+  @Value(
+      "${upload.avatarPath:C\\\\\\\\Users\\\\\\\\Administrator\\\\\\\\Desktop\\\\\\\\yuliyuli_enterprise\\\\\\\\yuliyuli-frontend\\\\\\\\static\\\\\\\\avatarUrl}")
   private String avatarPath;
 
   @Resource private UserService userService;
@@ -120,7 +116,8 @@ public class UserController {
           User registerDto,
       @Parameter(description = "校验参数（验证码）", required = true) @RequestParam String code) {
     try {
-      String message = userService.register(registerDto.getPhone(), code, registerDto.getPassword());
+      String message =
+          userService.register(registerDto.getPhone(), code, registerDto.getPassword());
       if (message == null) {
         return Result.fail("验证码错误!");
       }
@@ -154,8 +151,8 @@ public class UserController {
     // 修改用户信息
     try {
       String message =
-        userService.modifyInfo(
-            userInfoDto.getGender(), userInfoDto.getBirthday(), userInfoDto.getSign());
+          userService.modifyInfo(
+              userInfoDto.getGender(), userInfoDto.getBirthday(), userInfoDto.getSign());
       if (message == null) {
         return Result.fail("修改失败!");
       }
@@ -175,13 +172,13 @@ public class UserController {
   @Operation(summary = "修改模块")
   @PostMapping("/modifyAvatar")
   public Result<Object> modifyAvatar(@RequestParam MultipartFile avatar) {
-    try{
+    try {
       User currentUser = CurrentUserHolder.getUser();
       Long userId = currentUser.getUserId();
       // 上传头像,返回头像URL
       String avatarUrl = transferUtil.uploadAvatar(avatar, avatarPath);
       String message = userService.modifyAvatar(avatarUrl, userId);
-      if(message.equals("修改成功!")){
+      if (message.equals("修改成功!")) {
         return Result.success(avatarUrl);
       }
       return Result.fail("修改头像失败");

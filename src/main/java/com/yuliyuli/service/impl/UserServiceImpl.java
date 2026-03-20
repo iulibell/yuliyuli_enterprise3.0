@@ -1,9 +1,9 @@
 package com.yuliyuli.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.yuliyuli.entity.CurrentUserHolder;
 import com.yuliyuli.entity.ExistingPhone;
 import com.yuliyuli.entity.User;
-import com.yuliyuli.entity.CurrentUserHolder;
 import com.yuliyuli.entity.UserInfo;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.mapper.ExistPhoneMapper;
@@ -14,18 +14,16 @@ import com.yuliyuli.query.UserWrapper;
 import com.yuliyuli.service.UserService;
 import com.yuliyuli.util.JwtUtil;
 import com.yuliyuli.vo.LoginVO;
-
+import jakarta.annotation.Resource;
+import java.util.Date;
+import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.query.Criteria;
 import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.data.elasticsearch.core.query.ScriptType;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
-
-import jakarta.annotation.Resource;
-import java.util.Date;
-import java.util.concurrent.TimeUnit;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -113,11 +111,11 @@ public class UserServiceImpl implements UserService {
     try {
       String code = String.valueOf((int) (Math.random() * 900000 + 100000));
       String redisKey = SMS_CODE_PREFIX + phone;
-    // 4. 保存验证码到Redis（替换内存存储，解决多线程问题）
-    redisTemplate.opsForValue().set(redisKey, code, SMS_CODE_EXPIRE, TimeUnit.MINUTES);
-    System.out.println("验证码：" + code);
-    log.info("手机号{}生成验证码：{}，有效期{}分钟", phone, code, SMS_CODE_EXPIRE);
-    return "验证码发送成功!";
+      // 4. 保存验证码到Redis（替换内存存储，解决多线程问题）
+      redisTemplate.opsForValue().set(redisKey, code, SMS_CODE_EXPIRE, TimeUnit.MINUTES);
+      System.out.println("验证码：" + code);
+      log.info("手机号{}生成验证码：{}，有效期{}分钟", phone, code, SMS_CODE_EXPIRE);
+      return "验证码发送成功!";
     } catch (Exception e) {
       log.error("生成验证码异常", e);
       return "获取验证码失败,请稍后重试";
@@ -208,19 +206,19 @@ public class UserServiceImpl implements UserService {
   @Override
   public String modifyAvatar(String avatarUrl, Long userId) {
     try {
-        // 1. 更新数据库用户头像
-        userMapper.updateAvatar(userId, avatarUrl);
+      // 1. 更新数据库用户头像
+      userMapper.updateAvatar(userId, avatarUrl);
 
-        // 2. 更新数据库中视频的作者头像
-        videoMapper.updateVideoAuthorAvatar(userId, avatarUrl);
+      // 2. 更新数据库中视频的作者头像
+      videoMapper.updateVideoAuthorAvatar(userId, avatarUrl);
 
-        // 3. 同步更新 ES 中头像（直接调用你本类的方法）
-        syncUserInfoToVideoEs(userId, null, avatarUrl);
+      // 3. 同步更新 ES 中头像（直接调用你本类的方法）
+      syncUserInfoToVideoEs(userId, null, avatarUrl);
 
-        return "修改成功!";
+      return "修改成功!";
     } catch (Exception e) {
-        log.error("用户{}修改头像失败", userId, e);
-        throw new GlobalExceptionHandler.BusinessException("修改头像失败：" + e.getMessage());
+      log.error("用户{}修改头像失败", userId, e);
+      throw new GlobalExceptionHandler.BusinessException("修改头像失败：" + e.getMessage());
     }
   }
 
@@ -233,35 +231,42 @@ public class UserServiceImpl implements UserService {
    */
   public void syncUserInfoToVideoEs(Long userId, String newAuthorName, String newAuthorAvatar) {
     try {
-        // 拼接更新脚本
-        StringBuilder script = new StringBuilder();
-        if (newAuthorName != null) {
-            script.append("ctx._source.authorName = '").append(newAuthorName.replace("'", "\\'")).append("';");
-        }
-        if (newAuthorAvatar != null) {
-            script.append("ctx._source.authorAvatar = '").append(newAuthorAvatar.replace("'", "\\'")).append("';");
-        }
+      // 拼接更新脚本
+      StringBuilder script = new StringBuilder();
+      if (newAuthorName != null) {
+        script
+            .append("ctx._source.authorName = '")
+            .append(newAuthorName.replace("'", "\\'"))
+            .append("';");
+      }
+      if (newAuthorAvatar != null) {
+        script
+            .append("ctx._source.authorAvatar = '")
+            .append(newAuthorAvatar.replace("'", "\\'"))
+            .append("';");
+      }
 
-        if (script.length() == 0) return;
+      if (script.length() == 0) return;
 
-        // ------------------- 最兼容、最简单的查询方式 -------------------
-        Criteria criteria = Criteria.where("userId").is(userId);
-        CriteriaQuery criteriaQuery = new CriteriaQuery(criteria);
+      // ------------------- 最兼容、最简单的查询方式 -------------------
+      Criteria criteria = Criteria.where("userId").is(userId);
+      CriteriaQuery criteriaQuery = new CriteriaQuery(criteria);
 
-        // 构建更新
-        UpdateQuery updateQuery = UpdateQuery.builder(criteriaQuery)
-                .withScript(script.toString())
-                .withScriptType(ScriptType.INLINE)
-                .withRetryOnConflict(3)
-                .build();
+      // 构建更新
+      UpdateQuery updateQuery =
+          UpdateQuery.builder(criteriaQuery)
+              .withScript(script.toString())
+              .withScriptType(ScriptType.INLINE)
+              .withRetryOnConflict(3)
+              .build();
 
-        // 执行更新
-        elasticsearchOperations.updateByQuery(updateQuery, IndexCoordinates.of("video"));
+      // 执行更新
+      elasticsearchOperations.updateByQuery(updateQuery, IndexCoordinates.of("video"));
 
-        log.info("✅ ES 头像/昵称同步成功 userId:{}", userId);
+      log.info("✅ ES 头像/昵称同步成功 userId:{}", userId);
 
     } catch (GlobalExceptionHandler.BusinessException e) {
-        log.error("ES 同步失败", e);
+      log.error("ES 同步失败", e);
     }
   }
 }
