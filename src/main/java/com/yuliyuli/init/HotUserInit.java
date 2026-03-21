@@ -1,10 +1,11 @@
 package com.yuliyuli.init;
 
+import com.yuliyuli.dto.query.FollowWrapper;
+import com.yuliyuli.dto.query.UserWrapper;
 import com.yuliyuli.entity.User;
 import com.yuliyuli.mapper.FollowMapper;
 import com.yuliyuli.mapper.UserMapper;
-import com.yuliyuli.query.FollowWrapper;
-import com.yuliyuli.query.UserWrapper;
+
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import java.time.Duration;

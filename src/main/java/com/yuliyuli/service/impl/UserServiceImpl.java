@@ -1,7 +1,9 @@
 package com.yuliyuli.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.yuliyuli.entity.CurrentUserHolder;
+import com.yuliyuli.common.CurrentUserHolder;
+import com.yuliyuli.dto.query.UserWrapper;
+import com.yuliyuli.dto.vo.LoginVO;
 import com.yuliyuli.entity.ExistingPhone;
 import com.yuliyuli.entity.User;
 import com.yuliyuli.entity.UserInfo;
@@ -10,10 +12,9 @@ import com.yuliyuli.mapper.ExistPhoneMapper;
 import com.yuliyuli.mapper.UserInfoMapper;
 import com.yuliyuli.mapper.UserMapper;
 import com.yuliyuli.mapper.VideoMapper;
-import com.yuliyuli.query.UserWrapper;
 import com.yuliyuli.service.UserService;
 import com.yuliyuli.util.JwtUtil;
-import com.yuliyuli.vo.LoginVO;
+
 import jakarta.annotation.Resource;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;

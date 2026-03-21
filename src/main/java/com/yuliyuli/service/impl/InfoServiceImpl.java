@@ -1,15 +1,16 @@
 package com.yuliyuli.service.impl;
 
+import com.yuliyuli.common.CurrentUserHolder;
 import com.yuliyuli.config.RabbitMqConfig;
-import com.yuliyuli.entity.CurrentUserHolder;
+import com.yuliyuli.dto.query.VideoWrapper;
+import com.yuliyuli.dto.vo.VideoVO;
 import com.yuliyuli.entity.User;
 import com.yuliyuli.mapper.FollowMapper;
 import com.yuliyuli.mapper.UserMapper;
 import com.yuliyuli.mapper.VideoMapper;
-import com.yuliyuli.query.VideoWrapper;
 import com.yuliyuli.service.InfoService;
 import com.yuliyuli.util.VideoConvertUtil;
-import com.yuliyuli.vo.VideoVO;
+
 import jakarta.annotation.Resource;
 import java.util.HashMap;
 import java.util.List;
