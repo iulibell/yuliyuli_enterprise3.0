@@ -28,11 +28,19 @@ import org.springframework.data.elasticsearch.core.query.UpdateQuery;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
 @Slf4j
-public class UserServiceImpl implements UserService {
+public class UserServiceImpl implements UserService { 
+
+  // Redis验证码缓存前缀
+  private static final String SMS_CODE_PREFIX = "register:code:";
+  // 验证码有效期5分钟
+  private static final long SMS_CODE_EXPIRE = 1;
+  // 用户登录缓存前缀
+  private static final String LOGIN_TOKEN_PREFIX = "login:token:";
 
   @Resource private UserMapper userMapper;
 
@@ -51,13 +59,6 @@ public class UserServiceImpl implements UserService {
   @Resource private VideoMapper videoMapper;
 
   @Resource private ElasticsearchOperations elasticsearchOperations;
-
-  // Redis验证码缓存前缀
-  private static final String SMS_CODE_PREFIX = "register:code:";
-  // 验证码有效期5分钟
-  private static final long SMS_CODE_EXPIRE = 1;
-  // 用户登录缓存前缀
-  private static final String LOGIN_TOKEN_PREFIX = "login:token:";
 
   // 用于判断输入时的验证码是否正确
   String registerCode = "";
@@ -124,6 +125,7 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
+  @Transactional(rollbackFor = Exception.class)
   public String register(String phone, String code, String password) {
     // 1. 参数校验
     if (!StringUtils.hasText(phone)
@@ -182,6 +184,7 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
+  @Transactional(rollbackFor = Exception.class)
   public String modifyInfo(short gender, Date birthday, String sign) {
     // 从 UserHolder 获取当前登录用户
     User user = CurrentUserHolder.getUser();
@@ -205,6 +208,7 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
+  @Transactional(rollbackFor = Exception.class)
   public String modifyAvatar(String avatarUrl, Long userId) {
     try {
       // 1. 更新数据库用户头像

@@ -1,16 +1,18 @@
 package com.yuliyuli.service.impl;
 
 import com.yuliyuli.document.VideoDocument;
+import com.yuliyuli.dto.query.VideoWrapper;
+import com.yuliyuli.dto.vo.SearchVideoVO;
 import com.yuliyuli.init.SearchVideoInit;
 import com.yuliyuli.mapper.VideoMapper;
-import com.yuliyuli.query.VideoWrapper;
 import com.yuliyuli.repository.VideoRepository;
 import com.yuliyuli.service.SearchService;
 import com.yuliyuli.util.VideoConvertUtil;
-import com.yuliyuli.vo.SearchVideoVO;
+
 import jakarta.annotation.Resource;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,7 @@ public class SearchServiceImpl implements SearchService {
 
   @Resource private RedisTemplate<String, VideoDocument> redisTemplate;
 
+  @Cacheable(value = "topTenVideo", unless = "#result == null")
   public List<SearchVideoVO> getTopTenVideo() {
     try {
       List<VideoDocument> topTenVideo =
@@ -41,6 +44,7 @@ public class SearchServiceImpl implements SearchService {
   }
 
   @Override
+  @Cacheable(value = "videoSuggest", key = "#title", unless = "#result == null")
   public List<SearchVideoVO> findByTitleSuggest(String title) {
     List<VideoDocument> videoDocuments = null;
     try {

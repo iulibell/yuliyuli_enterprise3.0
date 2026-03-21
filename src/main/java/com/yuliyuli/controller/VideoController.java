@@ -1,10 +1,15 @@
 package com.yuliyuli.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.yuliyuli.annotation.OperationLog;
 import com.yuliyuli.annotation.RateLimit;
+import com.yuliyuli.common.CurrentUserHolder;
 import com.yuliyuli.common.Result;
+import com.yuliyuli.dto.query.CommentWrapper;
+import com.yuliyuli.dto.vo.HotRecommendVideoVO;
+import com.yuliyuli.dto.vo.SearchVideoVO;
+import com.yuliyuli.dto.vo.VideoVO;
 import com.yuliyuli.entity.Comment;
-import com.yuliyuli.entity.CurrentUserHolder;
 import com.yuliyuli.entity.User;
 import com.yuliyuli.entity.VideoCollection;
 import com.yuliyuli.entity.VideoDeliveryWithoutFile;
@@ -12,13 +17,10 @@ import com.yuliyuli.entity.VideoLike;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.mapper.CommentMapper;
 import com.yuliyuli.mapper.FollowMapper;
-import com.yuliyuli.query.CommentWrapper;
 import com.yuliyuli.service.SearchService;
 import com.yuliyuli.service.VideoService;
 import com.yuliyuli.util.TransferUtil;
-import com.yuliyuli.vo.HotRecommendVideoVO;
-import com.yuliyuli.vo.SearchVideoVO;
-import com.yuliyuli.vo.VideoVO;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -87,6 +89,7 @@ public class VideoController {
    * @param video
    * @return 处理结果
    */
+  @OperationLog(value = "视频投递", type = "VIDEO_UPLOAD")
   @PostMapping("/delivery")
   @Operation(summary = "视频投递")
   public Result<Object> deliveryVideo(
@@ -130,6 +133,7 @@ public class VideoController {
     }
   }
 
+  @OperationLog(value = "视频点赞", type = "VIDEO_LIKE")
   @RateLimit(limit = 10, window = 60, key = "like")
   @PostMapping("/like")
   @Operation(summary = "视频点赞")
@@ -153,6 +157,7 @@ public class VideoController {
    * @param videoCollect
    * @return 处理结果
    */
+  @OperationLog(value = "视频收藏", type = "VIDEO_COLLECT")
   @RateLimit(limit = 10, window = 60, key = "collect")
   @PostMapping("/collect")
   @Operation(summary = "视频收藏")

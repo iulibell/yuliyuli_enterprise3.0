@@ -2,10 +2,14 @@ package com.yuliyuli.service.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yuliyuli.common.CurrentUserHolder;
 import com.yuliyuli.config.RabbitMqConfig;
 import com.yuliyuli.document.VideoDocument;
+import com.yuliyuli.dto.query.VideoWrapper;
+import com.yuliyuli.dto.vo.HotRecommendVideoVO;
+import com.yuliyuli.dto.vo.SearchVideoVO;
+import com.yuliyuli.dto.vo.VideoVO;
 import com.yuliyuli.entity.Comment;
-import com.yuliyuli.entity.CurrentUserHolder;
 import com.yuliyuli.entity.User;
 import com.yuliyuli.entity.Video;
 import com.yuliyuli.entity.VideoCollection;
@@ -15,14 +19,11 @@ import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.init.SearchVideoInit;
 import com.yuliyuli.init.VideoInfoInit;
 import com.yuliyuli.mapper.VideoMapper;
-import com.yuliyuli.query.VideoWrapper;
 import com.yuliyuli.service.SearchService;
 import com.yuliyuli.service.VideoService;
 import com.yuliyuli.util.BloomFilterUtil;
 import com.yuliyuli.util.VideoConvertUtil;
-import com.yuliyuli.vo.HotRecommendVideoVO;
-import com.yuliyuli.vo.SearchVideoVO;
-import com.yuliyuli.vo.VideoVO;
+
 import jakarta.annotation.Resource;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ import org.redisson.api.RBucket;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -312,6 +314,7 @@ public class VideoServiceImpl implements VideoService {
    * @return 视频列表
    */
   @Override
+  @Cacheable(value = "videoByType", key = "#typeId + ':' + #pageNum", unless = "#result == null")
   public Page<VideoVO> getVideoAccordingTypeId(int typeId, int pageNum, int pageSize) {
     try {
       Page<Video> videoPage =

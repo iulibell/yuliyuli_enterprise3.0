@@ -1,15 +1,17 @@
 package com.yuliyuli.controller;
 
+import com.yuliyuli.annotation.OperationLog;
 import com.yuliyuli.annotation.RateLimit;
+import com.yuliyuli.common.CurrentUserHolder;
 import com.yuliyuli.common.Result;
-import com.yuliyuli.entity.CurrentUserHolder;
+import com.yuliyuli.dto.vo.LoginVO;
 import com.yuliyuli.entity.ExistingPhone;
 import com.yuliyuli.entity.User;
 import com.yuliyuli.entity.UserInfo;
 import com.yuliyuli.service.UserService;
 import com.yuliyuli.util.JwtUtil;
 import com.yuliyuli.util.TransferUtil;
-import com.yuliyuli.vo.LoginVO;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -52,6 +54,7 @@ public class UserController {
    * @param loginUser 登录参数（账号+密码）
    * @return 登录结果（Token+用户信息）
    */
+  @OperationLog(value = "用户登录", type = "LOGIN")
   @RateLimit(key = "login", limit = 10, window = 60)
   @Operation(summary = "用户登录")
   @PostMapping("/login")
@@ -108,6 +111,7 @@ public class UserController {
    * @param code 校验参数（验证码）
    * @return 注册结果（用户信息）
    */
+  @OperationLog(value = "用户注册", type = "REGISTER")
   @RateLimit(key = "register", limit = 5, window = 60)
   @Operation(summary = "注册模块")
   @PostMapping("/register")

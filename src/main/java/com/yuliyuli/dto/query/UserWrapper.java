@@ -1,4 +1,4 @@
-package com.yuliyuli.query;
+package com.yuliyuli.dto.query;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yuliyuli.entity.ExistingPhone;
@@ -34,7 +34,7 @@ public class UserWrapper {
    * 根据手机号构造查询条件（校验手机号是否存在）
    *
    * @param phone 手机号
-   * @return LambdaQueryWrapper<User> 查询条件（统一基于User实体，而非ExistPhone DTO）
+   * @return LambdaQueryWrapper<ExistingPhone> 查询条件
    */
   public LambdaQueryWrapper<ExistingPhone> buildUserByPhone(String phone) {
     return new LambdaQueryWrapper<ExistingPhone>()
