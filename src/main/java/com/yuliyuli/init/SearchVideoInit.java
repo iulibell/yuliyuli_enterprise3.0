@@ -1,6 +1,5 @@
 package com.yuliyuli.init;
 
-import com.yuliyuli.document.VideoDocument;
 import jakarta.annotation.Resource;
 import java.util.List;
 import java.util.Random;
@@ -17,6 +16,8 @@ import org.springframework.data.elasticsearch.core.query.Criteria;
 import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
+
+import com.yuliyuli.entity.document.VideoDocument;
 
 @Component
 @Slf4j

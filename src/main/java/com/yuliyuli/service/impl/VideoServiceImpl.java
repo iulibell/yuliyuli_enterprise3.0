@@ -4,17 +4,17 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yuliyuli.common.CurrentUserHolder;
 import com.yuliyuli.config.RabbitMqConfig;
-import com.yuliyuli.document.VideoDocument;
 import com.yuliyuli.dto.query.VideoWrapper;
 import com.yuliyuli.dto.vo.HotRecommendVideoVO;
 import com.yuliyuli.dto.vo.SearchVideoVO;
 import com.yuliyuli.dto.vo.VideoVO;
-import com.yuliyuli.entity.Comment;
-import com.yuliyuli.entity.User;
-import com.yuliyuli.entity.Video;
-import com.yuliyuli.entity.VideoCollection;
-import com.yuliyuli.entity.VideoDeliveryWithoutFile;
-import com.yuliyuli.entity.VideoLike;
+import com.yuliyuli.entity.delivery.VideoDeliveryWithoutFile;
+import com.yuliyuli.entity.document.VideoDocument;
+import com.yuliyuli.entity.user.User;
+import com.yuliyuli.entity.video.Comment;
+import com.yuliyuli.entity.video.Video;
+import com.yuliyuli.entity.video.VideoCollection;
+import com.yuliyuli.entity.video.VideoLike;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.init.SearchVideoInit;
 import com.yuliyuli.init.VideoInfoInit;
@@ -309,7 +309,6 @@ public class VideoServiceImpl implements VideoService {
 
   /**
    * 用户点击顶部导航后根据视频类型id获取视频列表
-   *
    * @param typeId 视频类型id
    * @return 视频列表
    */

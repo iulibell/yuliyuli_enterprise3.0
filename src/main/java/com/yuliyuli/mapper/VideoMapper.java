@@ -1,8 +1,9 @@
 package com.yuliyuli.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.yuliyuli.entity.Video;
-import com.yuliyuli.entity.VideoLike;
+import com.yuliyuli.entity.video.Video;
+import com.yuliyuli.entity.video.VideoLike;
+
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Update;

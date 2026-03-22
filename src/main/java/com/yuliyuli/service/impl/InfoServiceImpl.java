@@ -4,7 +4,7 @@ import com.yuliyuli.common.CurrentUserHolder;
 import com.yuliyuli.config.RabbitMqConfig;
 import com.yuliyuli.dto.query.VideoWrapper;
 import com.yuliyuli.dto.vo.VideoVO;
-import com.yuliyuli.entity.User;
+import com.yuliyuli.entity.user.User;
 import com.yuliyuli.mapper.FollowMapper;
 import com.yuliyuli.mapper.UserMapper;
 import com.yuliyuli.mapper.VideoMapper;

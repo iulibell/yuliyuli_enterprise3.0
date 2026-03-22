@@ -1,8 +1,9 @@
 package com.yuliyuli.controller;
 
 import com.yuliyuli.common.Result;
+import com.yuliyuli.dto.vo.SearchVideoVO;
 import com.yuliyuli.service.SearchService;
-import com.yuliyuli.vo.SearchVideoVO;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;

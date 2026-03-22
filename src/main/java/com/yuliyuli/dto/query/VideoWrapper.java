@@ -1,7 +1,8 @@
-package com.yuliyuli.query;
+package com.yuliyuli.dto.query;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.yuliyuli.entity.Video;
+import com.yuliyuli.entity.video.Video;
+
 import org.springframework.stereotype.Component;
 
 @Component

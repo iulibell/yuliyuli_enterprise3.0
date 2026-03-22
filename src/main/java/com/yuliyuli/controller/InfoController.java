@@ -1,8 +1,9 @@
 package com.yuliyuli.controller;
 
 import com.yuliyuli.common.Result;
+import com.yuliyuli.dto.vo.VideoVO;
 import com.yuliyuli.service.InfoService;
-import com.yuliyuli.vo.VideoVO;
+
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import java.util.List;

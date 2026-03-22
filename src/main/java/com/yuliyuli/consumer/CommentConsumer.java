@@ -3,11 +3,12 @@ package com.yuliyuli.consumer;
 import cn.ipokerface.snowflake.SnowflakeIdGenerator;
 import com.rabbitmq.client.Channel;
 import com.yuliyuli.config.RabbitMqConfig;
-import com.yuliyuli.entity.Comment;
+import com.yuliyuli.dto.query.VideoWrapper;
+import com.yuliyuli.entity.video.Comment;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.mapper.CommentMapper;
 import com.yuliyuli.mapper.VideoMapper;
-import com.yuliyuli.query.VideoWrapper;
+
 import jakarta.annotation.Resource;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;

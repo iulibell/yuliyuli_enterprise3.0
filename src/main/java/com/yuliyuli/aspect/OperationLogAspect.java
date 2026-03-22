@@ -2,7 +2,8 @@ package com.yuliyuli.aspect;
 
 import com.yuliyuli.annotation.OperationLog;
 import com.yuliyuli.common.CurrentUserHolder;
-import com.yuliyuli.entity.User;
+import com.yuliyuli.entity.user.User;
+
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.Arrays;

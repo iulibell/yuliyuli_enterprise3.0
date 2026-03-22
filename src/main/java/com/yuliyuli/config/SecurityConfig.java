@@ -42,27 +42,31 @@ public class SecurityConfig {
                 authorize
                     .requestMatchers(CorsUtils::isPreFlightRequest)
                     .permitAll()
-                    .requestMatchers(
-                        "/api/user/login",
-                        "/api/user/register",
-                        "/api/user/getCode",
-                        "/api/video/videoList",
-                        "/api/video/videoTypeList",
-                        "/api/video/clickVideo/**",
-                        "/api/info/authorPage/**",
-                        "/api/info/videoDelete/**",
-                        "/api/video/delivery",
-                        "/api/video/like",
-                        "/api/video/comment",
-                        "/api/video/collect",
-                        "/api/user/modifyInfo",
-                        "/api/info/follow",
-                        "/api/search/video",
-                        "/api/search/topTenVideo",
-                        "/api/user/modifyAvatar")
-                    .permitAll()
-                    .anyRequest()
-                    .authenticated())
+                    // 白名单接口
+                        .requestMatchers(
+                                "/api/user/login",
+                                "/api/user/register",
+                                "/api/user/getCode",
+                                "/api/video/videoList",
+                                "/api/video/videoTypeList",
+                                "/api/video/clickVideo/**",
+                                "/api/info/authorPage/**",
+                                "/api/search/video",
+                                "/api/search/topTenVideo"
+                        ).permitAll()
+                        // 以下接口必须登录才能访问
+                        .requestMatchers(
+                          "/api/video/delivery",
+                                "/api/video/like",
+                                "/api/video/comment",
+                                "/api/video/collect",
+                                "/api/user/modifyInfo",
+                                "/api/user/modifyAvatar",
+                                "/api/info/follow",
+                                "/api/info/videoDelete/**"
+                        ).authenticated()
+                        // 其他所有接口都需要认证
+                        .anyRequest().authenticated())
         .exceptionHandling(
             ex ->
                 ex.authenticationEntryPoint(

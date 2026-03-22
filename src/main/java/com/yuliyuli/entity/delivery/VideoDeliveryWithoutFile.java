@@ -1,17 +1,10 @@
-package com.yuliyuli.entity;
+package com.yuliyuli.entity.delivery;
 
 import io.swagger.v3.oas.annotations.Parameter;
 import lombok.Data;
-import org.springframework.web.multipart.MultipartFile;
 
 @Data
-public class VideoDelivery {
-  @Parameter(name = "视频文件")
-  private MultipartFile videoFile;
-
-  @Parameter(name = "视频封面文件")
-  private MultipartFile coverFile;
-
+public class VideoDeliveryWithoutFile {
   @Parameter(name = "作者Id")
   private Long userId;
 
@@ -32,4 +25,10 @@ public class VideoDelivery {
 
   @Parameter(name = "作者名称")
   private String authorName;
+
+  @Parameter(name = "初始未删除")
+  private int isDelete;
+
+  @Parameter(name = "作者头像")
+  private String authorAvatar;
 }

@@ -1,9 +1,9 @@
 package com.yuliyuli.init;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.yuliyuli.entity.Video;
+import com.yuliyuli.dto.query.VideoWrapper;
+import com.yuliyuli.entity.video.Video;
 import com.yuliyuli.mapper.VideoMapper;
-import com.yuliyuli.query.VideoWrapper;
 import com.yuliyuli.util.BloomFilterUtil;
 import jakarta.annotation.Resource;
 import java.util.List;

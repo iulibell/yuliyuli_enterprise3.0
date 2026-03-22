@@ -1,4 +1,4 @@
-package com.yuliyuli.entity;
+package com.yuliyuli.entity.video;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;

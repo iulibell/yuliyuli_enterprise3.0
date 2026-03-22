@@ -2,7 +2,7 @@ package com.yuliyuli.init;
 
 import com.yuliyuli.dto.query.FollowWrapper;
 import com.yuliyuli.dto.query.UserWrapper;
-import com.yuliyuli.entity.User;
+import com.yuliyuli.entity.user.User;
 import com.yuliyuli.mapper.FollowMapper;
 import com.yuliyuli.mapper.UserMapper;
 

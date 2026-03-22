@@ -1,7 +1,8 @@
 package com.yuliyuli.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.yuliyuli.entity.Comment;
+import com.yuliyuli.entity.video.Comment;
+
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 

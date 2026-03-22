@@ -1,7 +1,8 @@
 package com.yuliyuli.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.yuliyuli.entity.Follow;
+import com.yuliyuli.entity.info.Follow;
+
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Select;

@@ -1,4 +1,4 @@
-package com.yuliyuli.vo;
+package com.yuliyuli.dto.vo;
 
 import java.util.Date;
 import lombok.Data;

@@ -9,11 +9,11 @@ import com.yuliyuli.dto.query.CommentWrapper;
 import com.yuliyuli.dto.vo.HotRecommendVideoVO;
 import com.yuliyuli.dto.vo.SearchVideoVO;
 import com.yuliyuli.dto.vo.VideoVO;
-import com.yuliyuli.entity.Comment;
-import com.yuliyuli.entity.User;
-import com.yuliyuli.entity.VideoCollection;
-import com.yuliyuli.entity.VideoDeliveryWithoutFile;
-import com.yuliyuli.entity.VideoLike;
+import com.yuliyuli.entity.delivery.VideoDeliveryWithoutFile;
+import com.yuliyuli.entity.user.User;
+import com.yuliyuli.entity.video.Comment;
+import com.yuliyuli.entity.video.VideoCollection;
+import com.yuliyuli.entity.video.VideoLike;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.mapper.CommentMapper;
 import com.yuliyuli.mapper.FollowMapper;
@@ -140,7 +140,9 @@ public class VideoController {
   public Result<Object> likeVideo(
       @Parameter(description = "传递的视频对象", required = true) @Validated @RequestBody
           VideoLike videoLike) {
-    checkLogin();
+    if(!checkLogin()){
+      return Result.fail("请完成登录");
+    }
     try {
       String message = videoService.videoLike(videoLike);
       log.info("视频点赞成功,视频ID:{},用户ID:{}", videoLike.getVideoId(), videoLike.getUserId());
@@ -164,7 +166,9 @@ public class VideoController {
   public Result<Object> collectVideo(
       @Parameter(description = "传递的视频对象", required = true) @Validated @RequestBody
           VideoCollection videoCollect) {
-    checkLogin();
+    if(!checkLogin()){
+      return Result.fail("请完成登录");
+    }
     try {
       String message = videoService.videoCollect(videoCollect);
       log.info("视频收藏成功,视频ID:{},用户ID:{}", videoCollect.getVideoId(), videoCollect.getUserId());
@@ -186,7 +190,9 @@ public class VideoController {
   @Operation(summary = "视频评论")
   public Result<Object> commentVideo(
       @Parameter(description = "传递的评论对象", required = true) @RequestBody Comment comment) {
-    checkLogin();
+    if(!checkLogin()){
+      return Result.fail("请完成登录");
+    }
     try {
       log.info("进入视频评论接口");
       String message = videoService.videoComment(comment);
@@ -241,8 +247,11 @@ public class VideoController {
   /**
    * 固定返回15个从100个热门缓存中获取的视频
    *
-   * @param videoId 视频ID
-   * @return 相关视频，即右边的视频栏
+   * @param videoUrl 视频的路径
+   * @param followUserId 作者Id
+   * @param fanUserId 登录用户Id
+   * @param lastId 上一页最后一条评论的Id
+   * @return 右侧推荐视频（热门视频），评论列表，是否关注了该作者
    */
   @GetMapping("/clickVideo")
   @Operation(summary = "根据视频ID获取相关视频")
@@ -254,33 +263,11 @@ public class VideoController {
     // 先对热门视频进行播放计数，再返回相关视频
     if (redisTemplate.opsForValue().get(videoUrl) != null) {
       videoService.hotVideoPlay(videoUrl);
-      // 返回的右侧热门推荐视频栏
-      List<HotRecommendVideoVO> hotVideoVOList = videoService.getRecommendHotVideo();
-      // 分页获取评论列表
-      Page<Comment> commentPage = new Page<>(1, 10);
-      commentMapper.selectPage(
-          commentPage, commentWrapper.getCommentListByCursor(videoUrl, lastId, 10));
-      Map<String, Object> response = new HashMap<>();
-      response.put("hotVideoVOList", hotVideoVOList);
-      // 传递评论列表
-      response.put("commentList", commentPage.getRecords());
-      response.put("isFollow", followMapper.getFollow(followUserId, fanUserId) != null);
-      return Result.success(response);
+      return clickCommonProcess(videoUrl, followUserId, fanUserId, lastId);
     } else {
       // 先对视频进行播放计数，再返回相关视频
       videoService.videoPlay(videoUrl);
-      // 返回的右侧热门推荐视频栏
-      List<HotRecommendVideoVO> hotVideoVOList = videoService.getRecommendHotVideo();
-      // 分页获取评论列表
-      Page<Comment> commentPage = new Page<>(1, 10);
-      commentMapper.selectPage(
-          commentPage, commentWrapper.getCommentListByCursor(videoUrl, lastId, 10));
-      Map<String, Object> response = new HashMap<>();
-      response.put("hotVideoVOList", hotVideoVOList);
-      // 传递评论列表
-      response.put("commentList", commentPage.getRecords());
-      response.put("isFollow", followMapper.getFollow(followUserId, fanUserId) != null);
-      return Result.success(response);
+      return clickCommonProcess(videoUrl, followUserId, fanUserId, lastId);
     }
   }
 
@@ -303,5 +290,28 @@ public class VideoController {
       log.error("根据视频类型id获取视频列表失败", e);
       throw new GlobalExceptionHandler.BusinessException("根据视频类型id获取视频列表失败");
     }
+  }
+
+  /**
+   * 点击打开视频后的通用处理方法
+   * @param videoUrl 视频路径
+   * @param followUserId 视频作者
+   * @param fanUserId 登录用户
+   * @param lastId 上一页最后一条评论的Id
+   * @return 右侧推荐视频（热门视频），评论列表，是否关注了该作者
+   */
+  private Result<Map<String,Object>> clickCommonProcess(String videoUrl, Long followUserId, Long fanUserId, Long lastId){
+      // 返回的右侧热门推荐视频栏
+      List<HotRecommendVideoVO> hotVideoVOList = videoService.getRecommendHotVideo();
+      // 分页获取评论列表
+      Page<Comment> commentPage = new Page<>(1, 10);
+      commentMapper.selectPage(
+          commentPage, commentWrapper.getCommentListByCursor(videoUrl, lastId, 10));
+      Map<String, Object> response = new HashMap<>();
+      response.put("hotVideoVOList", hotVideoVOList);
+      // 传递评论列表
+      response.put("commentList", commentPage.getRecords());
+      response.put("isFollow", followMapper.getFollow(followUserId, fanUserId) != null);
+      return Result.success(response);
   }
 }

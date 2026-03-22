@@ -1,11 +1,12 @@
 package com.yuliyuli.util;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.yuliyuli.document.VideoDocument;
-import com.yuliyuli.entity.Video;
-import com.yuliyuli.vo.HotRecommendVideoVO;
-import com.yuliyuli.vo.SearchVideoVO;
-import com.yuliyuli.vo.VideoVO;
+import com.yuliyuli.dto.vo.HotRecommendVideoVO;
+import com.yuliyuli.dto.vo.SearchVideoVO;
+import com.yuliyuli.dto.vo.VideoVO;
+import com.yuliyuli.entity.document.VideoDocument;
+import com.yuliyuli.entity.video.Video;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

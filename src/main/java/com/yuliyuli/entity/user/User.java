@@ -1,9 +1,8 @@
-package com.yuliyuli.entity;
+package com.yuliyuli.entity.user;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.yuliyuli.annotation.Desensitize;
 import com.yuliyuli.config.DesensitizeSerializer;
@@ -37,7 +36,6 @@ public class User {
   @Parameter(name = "密码")
   @NotBlank(message = "密码不能为空")
   @Size(min = 8, max = 16, message = "密码长度必须在8到12之间")
-  @JsonIgnore
   private String password;
 
   @Parameter(name = "昵称")

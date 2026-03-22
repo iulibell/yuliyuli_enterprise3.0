@@ -1,8 +1,8 @@
 package com.yuliyuli.service.impl;
 
-import com.yuliyuli.document.VideoDocument;
 import com.yuliyuli.dto.query.VideoWrapper;
 import com.yuliyuli.dto.vo.SearchVideoVO;
+import com.yuliyuli.entity.document.VideoDocument;
 import com.yuliyuli.init.SearchVideoInit;
 import com.yuliyuli.mapper.VideoMapper;
 import com.yuliyuli.repository.VideoRepository;

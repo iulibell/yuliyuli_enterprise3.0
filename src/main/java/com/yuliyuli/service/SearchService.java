@@ -1,7 +1,8 @@
 package com.yuliyuli.service;
 
-import com.yuliyuli.vo.SearchVideoVO;
 import java.util.List;
+
+import com.yuliyuli.dto.vo.SearchVideoVO;
 
 public interface SearchService {
   /**
@@ -9,7 +10,7 @@ public interface SearchService {
    *
    * @return top10热度视频标题
    */
-  public List<com.yuliyuli.vo.SearchVideoVO> getTopTenVideo();
+  public List<com.yuliyuli.dto.vo.SearchVideoVO> getTopTenVideo();
 
   /**
    * 普通搜索视频功能

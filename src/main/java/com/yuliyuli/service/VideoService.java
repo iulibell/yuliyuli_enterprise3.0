@@ -1,13 +1,14 @@
 package com.yuliyuli.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.yuliyuli.entity.Comment;
-import com.yuliyuli.entity.VideoCollection;
-import com.yuliyuli.entity.VideoDeliveryWithoutFile;
-import com.yuliyuli.entity.VideoLike;
-import com.yuliyuli.vo.HotRecommendVideoVO;
-import com.yuliyuli.vo.SearchVideoVO;
-import com.yuliyuli.vo.VideoVO;
+import com.yuliyuli.dto.vo.HotRecommendVideoVO;
+import com.yuliyuli.dto.vo.SearchVideoVO;
+import com.yuliyuli.dto.vo.VideoVO;
+import com.yuliyuli.entity.delivery.VideoDeliveryWithoutFile;
+import com.yuliyuli.entity.video.Comment;
+import com.yuliyuli.entity.video.VideoCollection;
+import com.yuliyuli.entity.video.VideoLike;
+
 import java.util.List;
 
 public interface VideoService {

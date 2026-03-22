@@ -1,7 +1,8 @@
 package com.yuliyuli.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.yuliyuli.entity.UserInfo;
+import com.yuliyuli.entity.user.UserInfo;
+
 import org.apache.ibatis.annotations.Update;
 
 public interface UserInfoMapper extends BaseMapper<UserInfo> {

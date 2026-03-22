@@ -1,8 +1,9 @@
 package com.yuliyuli.service;
 
-import com.yuliyuli.vo.VideoVO;
 import java.util.List;
 import java.util.Map;
+
+import com.yuliyuli.dto.vo.VideoVO;
 
 public interface InfoService {
   /**

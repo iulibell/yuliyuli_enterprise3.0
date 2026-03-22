@@ -1,6 +1,7 @@
-package com.yuliyuli.vo;
+package com.yuliyuli.dto.vo;
 
-import com.yuliyuli.entity.User;
+import com.yuliyuli.entity.user.User;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;

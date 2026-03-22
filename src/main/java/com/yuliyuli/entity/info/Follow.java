@@ -1,4 +1,4 @@
-package com.yuliyuli.entity;
+package com.yuliyuli.entity.info;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;

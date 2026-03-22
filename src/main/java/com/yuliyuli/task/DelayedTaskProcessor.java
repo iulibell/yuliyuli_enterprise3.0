@@ -1,11 +1,12 @@
-package com.yuliyuli.timer;
+package com.yuliyuli.task;
 
-import com.yuliyuli.entity.VideoLike;
+import com.yuliyuli.dto.query.VideoLikeWrapper;
+import com.yuliyuli.entity.video.VideoLike;
 import com.yuliyuli.mapper.CommentMapper;
 import com.yuliyuli.mapper.FollowMapper;
 import com.yuliyuli.mapper.VideoLikeMapper;
 import com.yuliyuli.mapper.VideoMapper;
-import com.yuliyuli.query.VideoLikeWrapper;
+
 import jakarta.annotation.Resource;
 import java.util.Collection;
 import java.util.Map;

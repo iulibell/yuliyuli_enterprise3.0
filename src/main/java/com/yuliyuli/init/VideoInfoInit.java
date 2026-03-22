@@ -1,11 +1,12 @@
 package com.yuliyuli.init;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.yuliyuli.entity.Video;
+import com.yuliyuli.dto.query.VideoWrapper;
+import com.yuliyuli.dto.vo.VideoVO;
+import com.yuliyuli.entity.video.Video;
 import com.yuliyuli.mapper.VideoMapper;
-import com.yuliyuli.query.VideoWrapper;
 import com.yuliyuli.util.VideoConvertUtil;
-import com.yuliyuli.vo.VideoVO;
+
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import java.time.Duration;

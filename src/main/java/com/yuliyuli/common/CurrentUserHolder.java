@@ -1,4 +1,6 @@
-package com.yuliyuli.entity;
+package com.yuliyuli.common;
+
+import com.yuliyuli.entity.user.User;
 
 import lombok.extern.slf4j.Slf4j;
 

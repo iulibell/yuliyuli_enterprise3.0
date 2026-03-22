@@ -1,9 +1,9 @@
 package com.yuliyuli.interceptor;
 
 import com.alibaba.fastjson2.JSON;
+import com.yuliyuli.common.CurrentUserHolder;
 import com.yuliyuli.common.Result;
-import com.yuliyuli.entity.CurrentUserHolder;
-import com.yuliyuli.entity.User;
+import com.yuliyuli.entity.user.User;
 import com.yuliyuli.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;

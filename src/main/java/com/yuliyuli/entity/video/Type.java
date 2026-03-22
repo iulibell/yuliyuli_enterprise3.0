@@ -1,4 +1,4 @@
-package com.yuliyuli.entity;
+package com.yuliyuli.entity.video;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -7,15 +7,14 @@ import io.swagger.v3.oas.annotations.Parameter;
 import lombok.Data;
 
 @Data
-@TableName("exist_phone")
-public class ExistingPhone {
+@TableName("type")
+public class Type {
   @TableId(type = IdType.AUTO)
-  @Parameter(name = "主键id")
   private Long id;
 
-  @Parameter(name = "号主")
-  private String username;
+  @Parameter(name = "类型名称")
+  private String name;
 
-  @Parameter(name = "手机号")
-  private String phone;
+  @Parameter(name = "类型排序")
+  private int sort;
 }

@@ -1,4 +1,4 @@
-package com.yuliyuli.document;
+package com.yuliyuli.entity.document;
 
 import java.util.Date;
 import lombok.AllArgsConstructor;

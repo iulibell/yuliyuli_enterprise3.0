@@ -2,8 +2,8 @@ package com.yuliyuli.consumer;
 
 import com.rabbitmq.client.Channel;
 import com.yuliyuli.config.RabbitMqConfig;
-import com.yuliyuli.document.VideoDocument;
-import com.yuliyuli.entity.VideoDeliveryWithoutFile;
+import com.yuliyuli.entity.delivery.VideoDeliveryWithoutFile;
+import com.yuliyuli.entity.document.VideoDocument;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.mapper.VideoMapper;
 import com.yuliyuli.repository.VideoRepository;

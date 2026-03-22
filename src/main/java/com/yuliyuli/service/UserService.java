@@ -1,7 +1,8 @@
 package com.yuliyuli.service;
 
-import com.yuliyuli.vo.LoginVO;
 import java.util.Date;
+
+import com.yuliyuli.dto.vo.LoginVO;
 
 // 用户服务接口
 public interface UserService {

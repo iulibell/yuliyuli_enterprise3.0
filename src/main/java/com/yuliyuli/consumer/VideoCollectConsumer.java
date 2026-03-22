@@ -2,7 +2,7 @@ package com.yuliyuli.consumer;
 
 import com.rabbitmq.client.Channel;
 import com.yuliyuli.config.RabbitMqConfig;
-import com.yuliyuli.entity.VideoCollection;
+import com.yuliyuli.entity.video.VideoCollection;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.mapper.VideoMapper;
 import jakarta.annotation.Resource;

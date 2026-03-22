@@ -1,9 +1,10 @@
 package com.yuliyuli.dto.query;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.yuliyuli.entity.ExistingPhone;
-import com.yuliyuli.entity.User;
-import com.yuliyuli.entity.UserInfo;
+import com.yuliyuli.entity.user.ExistingPhone;
+import com.yuliyuli.entity.user.User;
+import com.yuliyuli.entity.user.UserInfo;
+
 import org.springframework.stereotype.Component;
 
 /** 用户相关查询/更新条件构造器 统一封装User、UserInfo的MyBatis-Plus条件，避免业务层重复写Wrapper逻辑 */
