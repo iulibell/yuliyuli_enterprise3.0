@@ -257,10 +257,7 @@
           <div class="login-body">
             <div class="qr-code-section">
               <div class="qr-code">
-                <img
-                  src="@/static/images/OIP-C.webp"
-                  alt="登录二维码"
-                />
+                <img src="/static/images/OIP-C.webp" alt="登录二维码" />
                 <p>请使用 yuliyuli 客户端扫码登录<br />或扫码下载APP</p>
               </div>
             </div>
