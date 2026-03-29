@@ -40,7 +40,7 @@ public class RedisConfig {
     template.setValueSerializer(jsonSerializer);
     // hash 的 value 序列化方式采用 jackson
     template.setHashValueSerializer(jsonSerializer);
-
+    
     template.afterPropertiesSet();
     return template;
   }

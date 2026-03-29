@@ -30,15 +30,15 @@ public class GlobalExceptionHandler {
     return Result.fail(e.getMessage());
   }
 
-  /** 处理所有未捕获的通用异常（必须放在最后） */
+  /** 处理所有未捕获的通用异常 */
   @ExceptionHandler(Exception.class)
   public Result<?> handleGlobalException(Exception e) {
     String errorMsg = "系统繁忙，请稍后再试";
-    log.error("全局通用异常", e); // 打印完整堆栈
+    log.error("全局通用异常", e);
     return Result.fail(errorMsg);
   }
 
-  /** 自定义业务异常类（建议放在同一个包下） */
+  /** 自定义业务异常类 */
   public static class BusinessException extends RuntimeException {
     public BusinessException(String message) {
       super(message);
