@@ -63,7 +63,7 @@ jobs:
 
       - name: Build images
         run: |
-          docker-compose -f docker-compose.yml build
+          docker compose -f docker-compose.yml build
 
   # ==================== 部署阶段 ====================
   deploy:
@@ -120,8 +120,8 @@ jobs:
 
             # 使用 Docker Compose 构建和启动服务
             echo "构建和启动服务..."
-            docker-compose -f $COMPOSE_FILE down --remove-orphans || true
-            docker-compose -f $COMPOSE_FILE up -d --build
+            docker compose -f $COMPOSE_FILE down --remove-orphans || true
+            docker compose -f $COMPOSE_FILE up -d --build
 
             # 等待服务启动
             sleep 30
