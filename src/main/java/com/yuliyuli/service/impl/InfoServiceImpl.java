@@ -1,8 +1,13 @@
 package com.yuliyuli.service.impl;
 
 import com.yuliyuli.common.CurrentUserHolder;
+import com.yuliyuli.common.ServiceResult;
 import com.yuliyuli.config.RabbitMqConfig;
+import com.yuliyuli.exception.GlobalExceptionHandler;
+import com.yuliyuli.dto.command.FollowCommand;
+import com.yuliyuli.dto.command.VideoDeleteCommand;
 import com.yuliyuli.dto.query.VideoWrapper;
+import com.yuliyuli.dto.vo.UserProfileVO;
 import com.yuliyuli.dto.vo.VideoVO;
 import com.yuliyuli.entity.user.User;
 import com.yuliyuli.mapper.FollowMapper;
@@ -12,9 +17,7 @@ import com.yuliyuli.service.InfoService;
 import com.yuliyuli.util.VideoConvertUtil;
 
 import jakarta.annotation.Resource;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
@@ -41,22 +44,23 @@ public class InfoServiceImpl implements InfoService {
    * @return 删除结果
    */
   @Override
-  public String videoDelete(String videoIUrl, Long userId) {
+  public ServiceResult videoDelete(String videoIUrl, Long userId) {
     if (!checkIsLogin()) {
       log.error("用户未登录，无法删除视频");
-      return "请完成登录";
+      return ServiceResult.fail("请完成登录");
     }
     try {
-      Map<String, Object> map = new HashMap<>();
-      map.put("videoUrl", videoIUrl);
-      map.put("userId", userId);
       rabbitTemplate.convertAndSend(
-          RabbitMqConfig.DELETE_EXCHANGE_NAME, RabbitMqConfig.DELETE_ROUTING_KEY, map);
+          RabbitMqConfig.DELETE_EXCHANGE_NAME,
+          RabbitMqConfig.DELETE_ROUTING_KEY,
+          new VideoDeleteCommand(videoIUrl, userId));
       log.info("删除视频传至mq成功,视频ID:{}", videoIUrl);
-      return "删除视频成功";
+      return ServiceResult.success("删除视频成功");
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("删除视频传至mq失败,视频ID:{}", videoIUrl, e);
-      return "删除视频失败,请稍后重试";
+      return ServiceResult.fail("删除视频失败,请稍后重试");
     }
   }
 
@@ -71,9 +75,11 @@ public class InfoServiceImpl implements InfoService {
     try {
       return VideoConvertUtil.convertVideoListToVideoVOList(
           videoMapper.selectList(videoWrapper.getAuthorPageVideo(userId)));
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("获取作者页面视频失败,作者ID:{}", userId, e);
-      throw new IllegalArgumentException("获取作者页面视频失败,作者ID:" + userId);
+      throw new GlobalExceptionHandler.BusinessException("获取作者页面视频失败,作者ID:" + userId);
     }
   }
 
@@ -84,23 +90,19 @@ public class InfoServiceImpl implements InfoService {
    * @return 用户信息，包括用户名、头像、关注数、粉丝数等
    */
   @Override
-  public Map<String, Object> getUserInfo(Long userId) {
+  public UserProfileVO getUserInfo(Long userId) {
     try {
       User user = userMapper.selectById(userId);
       if (user == null) {
         log.error("用户不存在,用户ID:{}", userId);
-        return null;
+        throw new GlobalExceptionHandler.BusinessException("该用户不存在!");
       }
-      Map<String, Object> userInfo = new HashMap<>();
-      userInfo.put("username", user.getUsername());
-      userInfo.put("nickname", user.getNickname());
-      userInfo.put("avatar", user.getAvatar());
-      userInfo.put("followCount", user.getFollowCount() == null ? 0 : user.getFollowCount());
-      userInfo.put("fansCount", user.getFansCount() == null ? 0 : user.getFansCount());
-      return userInfo;
+      return buildUserProfile(user, false);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("获取用户信息失败,用户ID:{}", userId, e);
-      throw new IllegalArgumentException("获取用户信息失败,用户ID:" + userId);
+      throw new GlobalExceptionHandler.BusinessException("获取用户信息失败,用户ID:" + userId);
     }
   }
 
@@ -111,7 +113,7 @@ public class InfoServiceImpl implements InfoService {
    * @return 用户信息，包括用户ID、用户名、头像、关注数、粉丝数等
    */
   @Override
-  public Map<String, Object> getUserInfoByAuthorName(String authorName) {
+  public UserProfileVO getUserInfoByAuthorName(String authorName) {
     try {
       User user =
           userMapper.selectOne(
@@ -121,63 +123,59 @@ public class InfoServiceImpl implements InfoService {
                   .eq(User::getNickname, authorName));
       if (user == null) {
         log.error("用户不存在,作者名字:{}", authorName);
-        return null;
+        throw new GlobalExceptionHandler.BusinessException("该作者不存在!");
       }
-      Map<String, Object> userInfo = new HashMap<>();
-      userInfo.put("userId", user.getId());
-      userInfo.put("username", user.getUsername());
-      userInfo.put("nickname", user.getNickname());
-      userInfo.put("avatar", user.getAvatar());
-      userInfo.put("followCount", user.getFollowCount() == null ? 0 : user.getFollowCount());
-      userInfo.put("fansCount", user.getFansCount() == null ? 0 : user.getFansCount());
-      return userInfo;
+      return buildUserProfile(user, true);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("获取用户信息失败,作者名字:{}", authorName, e);
-      throw new IllegalArgumentException("获取用户信息失败,作者名字:" + authorName);
+      throw new GlobalExceptionHandler.BusinessException("获取用户信息失败,作者名字:" + authorName);
     }
   }
 
-  public String userFollow(Long followUserId, Long fanUserId) {
+  public ServiceResult userFollow(Long followUserId, Long fanUserId) {
     if (!checkIsLogin()) {
       log.error("用户未登录，无法关注用户");
-      return "请完成登录";
+      return ServiceResult.fail("请完成登录");
     }
     try {
       // 检查是否已经关注
       if (followMapper.getFollow(followUserId, fanUserId) != null) {
         log.info("用户已经关注了该用户,关注用户ID:{},粉丝用户ID:{}", followUserId, fanUserId);
-        return "已经关注该用户";
+        return ServiceResult.fail("已经关注该用户");
       }
-      Map<String, Object> map = new HashMap<>();
-      map.put("followUserId", followUserId);
-      map.put("fanUserId", fanUserId);
       rabbitTemplate.convertAndSend(
-          RabbitMqConfig.FOLLOW_EXCHANGE_NAME, RabbitMqConfig.FOLLOW_ROUTING_KEY, map);
+          RabbitMqConfig.FOLLOW_EXCHANGE_NAME,
+          RabbitMqConfig.FOLLOW_ROUTING_KEY,
+          new FollowCommand(followUserId, fanUserId, "follow"));
       log.info("关注用户传至mq成功,关注用户ID:{}", followUserId);
-      return "关注成功";
+      return ServiceResult.success("关注成功");
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("关注用户传至mq失败,关注用户ID:{}", followUserId, e);
-      return "关注失败,请稍后重试";
+      return ServiceResult.fail("关注失败,请稍后重试");
     }
   }
 
-  public String userUnfollow(Long followUserId, Long fanUserId) {
+  public ServiceResult userUnfollow(Long followUserId, Long fanUserId) {
     if (!checkIsLogin()) {
       log.error("用户未登录，无法取消关注用户");
-      return "请完成登录";
+      return ServiceResult.fail("请完成登录");
     }
     try {
-      Map<String, Object> map = new HashMap<>();
-      map.put("followUserId", followUserId);
-      map.put("fanUserId", fanUserId);
-      map.put("operation", "unfollow");
       rabbitTemplate.convertAndSend(
-          RabbitMqConfig.FOLLOW_EXCHANGE_NAME, RabbitMqConfig.FOLLOW_ROUTING_KEY, map);
+          RabbitMqConfig.FOLLOW_EXCHANGE_NAME,
+          RabbitMqConfig.FOLLOW_ROUTING_KEY,
+          new FollowCommand(followUserId, fanUserId, "unfollow"));
       log.info("取消关注用户传至mq成功,关注用户ID:{}", followUserId);
-      return "取消关注成功";
+      return ServiceResult.success("取消关注成功");
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("取消关注用户传至mq失败,关注用户ID:{}", followUserId, e);
-      return "取消关注失败,请稍后重试";
+      return ServiceResult.fail("取消关注失败,请稍后重试");
     }
   }
 
@@ -186,5 +184,15 @@ public class InfoServiceImpl implements InfoService {
       return false;
     }
     return true;
+  }
+
+  private UserProfileVO buildUserProfile(User user, boolean includeUserId) {
+    return new UserProfileVO(
+        includeUserId ? user.getId() : null,
+        user.getUsername(),
+        user.getNickname(),
+        user.getAvatar(),
+        user.getFollowCount() == null ? 0L : user.getFollowCount(),
+        user.getFansCount() == null ? 0L : user.getFansCount());
   }
 }

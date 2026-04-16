@@ -2,6 +2,7 @@ package com.yuliyuli.consumer;
 
 import com.rabbitmq.client.Channel;
 import com.yuliyuli.config.RabbitMqConfig;
+import com.yuliyuli.consumer.support.ConsumerRetrySupport;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import jakarta.annotation.Resource;
 import java.util.Map;
@@ -23,9 +24,12 @@ public class HotVideoPlayConsumer {
   private final int LOCK_WAIT = 3; // 3秒
   private final int LOCK_RELEASE = 10; // 10秒
   private final String DELAY_KEY = "hot:video:play:delay";
+  private final String HOT_PLAY_COUNTER_KEY_PREFIX = "video:hot:play:";
   private final Long DELAY_TIME = 1000 * 3L; // 3秒
 
   @Resource private RedissonClient redissonClient;
+
+  @Resource private ConsumerRetrySupport consumerRetrySupport;
 
   @RabbitListener(queues = RabbitMqConfig.HOT_PLAY_QUEUE_NAME)
   public void videoPlay(String videoUrl, Channel channel, Message mqMessage) throws Exception {
@@ -33,7 +37,7 @@ public class HotVideoPlayConsumer {
     Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     // 从消息头中获取重试次数,如果没有则默认0
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
-    Integer retryCount = (Integer) headers.getOrDefault(RETRY_HEADER, 0);
+    int retryCount = consumerRetrySupport.getRetryCount(mqMessage, RETRY_HEADER);
     // 参数校验
     if (videoUrl == null) {
       log.error("视频URL为空");
@@ -46,20 +50,23 @@ public class HotVideoPlayConsumer {
       // 获取视频播放锁
       boolean isLock = lock.tryLock(LOCK_WAIT, LOCK_RELEASE, TimeUnit.SECONDS);
       if (!isLock) {
-        log.error("热门视频播放锁获取失败");
-        channel.basicNack(deliveryTag, false, true);
+        log.warn("热门视频播放锁获取失败");
+        consumerRetrySupport.handleRetry(
+            deliveryTag, channel, retryCount, MAX_RETRY_COUNT, headers, RETRY_HEADER, "热门播放");
         return;
       }
+      redissonClient.getAtomicLong(HOT_PLAY_COUNTER_KEY_PREFIX + videoUrl).incrementAndGet();
       // 放入延时有序集合
       redissonClient
           .getScoredSortedSet(DELAY_KEY)
           .add(System.currentTimeMillis() + DELAY_TIME, videoUrl);
       // 播放完成后，手动确认消息
       channel.basicAck(deliveryTag, false);
-      log.info("热门视频播放成功,视频URL:{}", videoUrl);
+      log.debug("热门视频播放消息入延时队列成功,视频URL:{}", videoUrl);
     } catch (Exception e) {
       log.error("热门视频播放消费异常,retry={}", retryCount, e);
-      handleRetry(deliveryTag, channel, retryCount, headers);
+      consumerRetrySupport.handleRetry(
+          deliveryTag, channel, retryCount, MAX_RETRY_COUNT, headers, RETRY_HEADER, "热门播放");
     } finally {
       if (lock.isHeldByCurrentThread()) {
         lock.unlock();
@@ -72,36 +79,10 @@ public class HotVideoPlayConsumer {
     log.info("播放死信消费者,视频URL:{}", videoUrl);
     Long diliverTag = mqMessage.getMessageProperties().getDeliveryTag();
     try {
-      channel.basicAck(diliverTag, false);
+      consumerRetrySupport.ackDeadLetter(diliverTag, channel, "热门播放");
     } catch (Exception e) {
       log.error("死信队列丢弃热门播放失败,视频URL:{}", videoUrl, e);
       throw new GlobalExceptionHandler.BusinessException("死信队列丢弃热门播放失败");
-    }
-  }
-
-  /**
-   * 处理重试
-   *
-   * @param deliveryTag 消息标签
-   * @param channel 通道
-   * @param retryCount 重试次数
-   * @param headers 消息头
-   */
-  private void handleRetry(
-      Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
-    if (retryCount < MAX_RETRY_COUNT) {
-      headers.put(RETRY_HEADER, retryCount + 1);
-      try {
-        channel.basicNack(deliveryTag, false, true);
-      } catch (Exception e) {
-        log.error("重试热门播放消息失败,重试次数:{}", retryCount + 1, e);
-      }
-    } else {
-      try {
-        channel.basicReject(deliveryTag, false);
-      } catch (Exception e) {
-        log.error("热门播放消息重试次数超过最大重试次数,已丢弃,重试次数:{}", retryCount, e);
-      }
     }
   }
 }

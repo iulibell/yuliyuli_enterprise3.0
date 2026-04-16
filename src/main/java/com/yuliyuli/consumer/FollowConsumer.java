@@ -2,6 +2,8 @@ package com.yuliyuli.consumer;
 
 import com.rabbitmq.client.Channel;
 import com.yuliyuli.config.RabbitMqConfig;
+import com.yuliyuli.consumer.support.ConsumerRetrySupport;
+import com.yuliyuli.dto.command.FollowCommand;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import jakarta.annotation.Resource;
 import java.util.Map;
@@ -29,60 +31,64 @@ public class FollowConsumer {
 
   @Resource RedissonClient redissonClient;
 
+  @Resource private ConsumerRetrySupport consumerRetrySupport;
+
   @RabbitListener(queues = RabbitMqConfig.FOLLOW_QUEUE_NAME)
-  public void followConsumer(Map<String, Object> map, Channel channel, Message mqMessage)
+  public void followConsumer(FollowCommand command, Channel channel, Message mqMessage)
       throws Exception {
     Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     // 校验参数
-    if (map.isEmpty() || !map.containsKey("fanUserId") || !map.containsKey("followUserId")) {
-      log.error("关注消费参数校验失败,fanUserId:{}", map.get("fanUserId"));
+    if (command == null || command.getFanUserId() == null || command.getFollowUserId() == null) {
+      log.error("关注消费参数校验失败,fanUserId:{}", command != null ? command.getFanUserId() : null);
       // 拒绝消息,不重新入队
       channel.basicReject(deliveryTag, false);
       return;
     }
 
     // 获取操作类型
-    String operation = (String) map.getOrDefault("operation", "follow");
+    String operation = command.getOperation() == null ? "follow" : command.getOperation();
 
     // 重试次数,从消息头中获取重试次数,如果没有则默认0
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
-    Integer retryCount = (Integer) headers.getOrDefault(RETRY_HEADER, 0);
+    int retryCount = consumerRetrySupport.getRetryCount(mqMessage, RETRY_HEADER);
     // 进行加锁操作
     RLock lock =
         redissonClient.getLock(
-            LOCK_KEY_PROFIX + map.get("fanUserId") + ":" + map.get("followUserId"));
+            LOCK_KEY_PROFIX + command.getFanUserId() + ":" + command.getFollowUserId());
     try {
       boolean isLock = lock.tryLock(LOCK_WAIT, LOCK_LEASE, TimeUnit.SECONDS);
       if (!isLock) {
-        log.error("关注操作加锁失败,fanUserId:{}", map.get("fanUserId"));
-        handleRetry(deliveryTag, channel, retryCount, headers);
+        log.error("关注操作加锁失败,fanUserId:{}", command.getFanUserId());
+        consumerRetrySupport.handleRetry(
+            deliveryTag, channel, retryCount, MAX_RETRY_COUNT, headers, RETRY_HEADER, "关注");
         return;
       }
 
       if ("unfollow".equals(operation)) {
         // 取消关注操作
-        String followKey = FOLLOW_KEY_PROFIX + map.get("fanUserId");
+        String followKey = FOLLOW_KEY_PROFIX + command.getFanUserId();
         RSet<String> followSet = redissonClient.getSet(followKey);
-        followSet.remove(map.get("followUserId").toString());
-        redissonClient.getScoredSortedSet(DELAY_KEY).add(DELAY_TIME, map);
+        followSet.remove(command.getFollowUserId().toString());
+        redissonClient.getScoredSortedSet(DELAY_KEY).add(System.currentTimeMillis() + DELAY_TIME, command);
         // 手动确认消息
         channel.basicAck(deliveryTag, false);
-        log.info("取消关注操作成功,fanUserId:{}", map.get("fanUserId"));
+        log.info("取消关注操作成功,fanUserId:{}", command.getFanUserId());
       } else {
         // 关注操作
         // 将主动关注的用户ID添加到关注集合中当主键，值为被关注的用户ID
-        String followKey = FOLLOW_KEY_PROFIX + map.get("fanUserId");
+        String followKey = FOLLOW_KEY_PROFIX + command.getFanUserId();
         RSet<String> followSet = redissonClient.getSet(followKey);
-        followSet.add(map.get("followUserId").toString());
-        redissonClient.getScoredSortedSet(DELAY_KEY).add(DELAY_TIME, map);
+        followSet.add(command.getFollowUserId().toString());
+        redissonClient.getScoredSortedSet(DELAY_KEY).add(System.currentTimeMillis() + DELAY_TIME, command);
         // 手动确认消息
         channel.basicAck(deliveryTag, false);
-        log.info("关注操作成功,fanUserId:{}", map.get("fanUserId"));
+        log.info("关注操作成功,fanUserId:{}", command.getFanUserId());
       }
     } catch (InterruptedException e) {
       log.error("关注操作加锁失败,重试次数:{}", retryCount, e);
       // 拒绝消息,不重新入队
-      handleRetry(deliveryTag, channel, retryCount, headers);
+      consumerRetrySupport.handleRetry(
+          deliveryTag, channel, retryCount, MAX_RETRY_COUNT, headers, RETRY_HEADER, "关注");
       return;
     } finally {
       // 释放锁
@@ -93,40 +99,14 @@ public class FollowConsumer {
   }
 
   @RabbitListener(queues = RabbitMqConfig.FOLLOW_DEAD_QUEUE_NAME)
-  public void followDeadConsumer(Map<String, Object> map, Channel channel, Message mqMessage) {
-    log.info("关注操作死信队列消费,fanUserId:{}", map.get("fanUserId"));
+  public void followDeadConsumer(FollowCommand command, Channel channel, Message mqMessage) {
+    log.info("关注操作死信队列消费,fanUserId:{}", command != null ? command.getFanUserId() : null);
     Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     try {
-      channel.basicAck(deliveryTag, false);
+      consumerRetrySupport.ackDeadLetter(deliveryTag, channel, "关注");
     } catch (Exception e) {
       log.error("关注死信队列消费异常", e);
       throw new GlobalExceptionHandler.BusinessException("关注死信队列消费异常");
-    }
-  }
-
-  /**
-   * 处理重试
-   *
-   * @param deliveryTag 消息标签
-   * @param channel 通道
-   * @param retryCount 重试次数
-   * @param headers 消息头
-   */
-  private void handleRetry(
-      Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
-    if (retryCount < MAX_RETRY_COUNT) {
-      headers.put(RETRY_HEADER, retryCount + 1);
-      try {
-        channel.basicNack(deliveryTag, false, true);
-      } catch (Exception e) {
-        log.error("重试评论消息失败,重试次数:{}", retryCount + 1, e);
-      }
-    } else {
-      try {
-        channel.basicReject(deliveryTag, false);
-      } catch (Exception e) {
-        log.error("评论消息重试次数超过最大重试次数,已丢弃,重试次数:{}", retryCount, e);
-      }
     }
   }
 }

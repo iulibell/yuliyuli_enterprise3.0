@@ -1,8 +1,8 @@
 package com.yuliyuli.service;
 
+import com.yuliyuli.common.ServiceResult;
+import com.yuliyuli.dto.vo.UserProfileVO;
 import java.util.List;
-import java.util.Map;
-
 import com.yuliyuli.dto.vo.VideoVO;
 
 public interface InfoService {
@@ -20,7 +20,7 @@ public interface InfoService {
    * @param userId 用户ID
    * @return 用户信息，包括用户名、头像、关注数、粉丝数等
    */
-  public Map<String, Object> getUserInfo(Long userId);
+  public UserProfileVO getUserInfo(Long userId);
 
   /**
    * 根据作者名字获取用户信息
@@ -28,7 +28,7 @@ public interface InfoService {
    * @param authorName 作者名字
    * @return 用户信息，包括用户ID、用户名、头像、关注数、粉丝数等
    */
-  public Map<String, Object> getUserInfoByAuthorName(String authorName);
+  public UserProfileVO getUserInfoByAuthorName(String authorName);
 
   /**
    * 删除视频
@@ -37,7 +37,7 @@ public interface InfoService {
    * @param coverUrl 封面URL
    * @return 删除结果
    */
-  public String videoDelete(String videoIUrl, Long userId);
+  public ServiceResult videoDelete(String videoIUrl, Long userId);
 
   /**
    * 用户关注
@@ -45,7 +45,7 @@ public interface InfoService {
    * @param followUserId 关注用户ID
    * @param fanUserId 粉丝用户ID
    */
-  public String userFollow(Long followUserId, Long fanUserId);
+  public ServiceResult userFollow(Long followUserId, Long fanUserId);
 
   /**
    * 用户取消关注
@@ -53,5 +53,5 @@ public interface InfoService {
    * @param followUserId 关注用户ID
    * @param fanUserId 粉丝用户ID
    */
-  public String userUnfollow(Long followUserId, Long fanUserId);
+  public ServiceResult userUnfollow(Long followUserId, Long fanUserId);
 }

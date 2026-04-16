@@ -19,7 +19,14 @@ public class GlobalExceptionHandler {
   /** 处理业务异常 */
   @ExceptionHandler(BusinessException.class)
   public Result<?> handleBusinessException(BusinessException e) {
-    log.error("业务异常: {}", e.getMessage());
+    log.warn("业务异常: {}", e.getMessage());
+    return Result.fail(e.getMessage());
+  }
+
+  /** 处理非法参数（如资源不存在等明确提示） */
+  @ExceptionHandler(IllegalArgumentException.class)
+  public Result<?> handleIllegalArgumentException(IllegalArgumentException e) {
+    log.warn("非法参数: {}", e.getMessage());
     return Result.fail(e.getMessage());
   }
 

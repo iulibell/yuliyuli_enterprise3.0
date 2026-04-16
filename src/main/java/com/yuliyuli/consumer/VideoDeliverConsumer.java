@@ -2,13 +2,13 @@ package com.yuliyuli.consumer;
 
 import com.rabbitmq.client.Channel;
 import com.yuliyuli.config.RabbitMqConfig;
+import com.yuliyuli.consumer.support.ConsumerRetrySupport;
 import com.yuliyuli.entity.delivery.VideoDeliveryWithoutFile;
 import com.yuliyuli.entity.document.VideoDocument;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.mapper.VideoMapper;
 import com.yuliyuli.repository.VideoRepository;
 import com.yuliyuli.util.BloomFilterUtil;
-import com.yuliyuli.util.TransferUtil;
 import jakarta.annotation.Resource;
 import java.util.Date;
 import java.util.Map;
@@ -30,8 +30,6 @@ public class VideoDeliverConsumer {
   private static final int LOCK_WAIT = 3; // 3秒
   private static final int LOCK_RELEASE = 10; // 10秒
 
-  @Resource private TransferUtil transferUtil;
-
   @Resource private VideoMapper videoMapper;
 
   @Resource private RedissonClient redissonClient;
@@ -39,6 +37,8 @@ public class VideoDeliverConsumer {
   @Resource private VideoRepository videoRepository;
 
   @Resource private BloomFilterUtil bloomFilterUtil;
+
+  @Resource private ConsumerRetrySupport consumerRetrySupport;
 
   /**
    * 视频队列消费者
@@ -52,7 +52,7 @@ public class VideoDeliverConsumer {
     Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     // 从消息头中获取重试次数,如果没有则默认0
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
-    Integer retryCount = (Integer) headers.getOrDefault(RETRY_HEADER, 0);
+    int retryCount = consumerRetrySupport.getRetryCount(mqMessage, RETRY_HEADER);
 
     if (videoDelivery == null) {
       log.error("视频分发消息为空");
@@ -71,7 +71,8 @@ public class VideoDeliverConsumer {
       boolean isLock = lock.tryLock(LOCK_WAIT, LOCK_RELEASE, TimeUnit.SECONDS);
       if (!isLock) {
         log.info("用户{}视频{}锁被其他线程占用,已重新放入队列", userId, videoId);
-        handleRetry(deliveryTag, channel, retryCount, headers);
+        consumerRetrySupport.handleRetry(
+            deliveryTag, channel, retryCount, MAX_RETRY_COUNT, headers, RETRY_HEADER, "视频分发");
         return;
       }
       log.info("开始保存到ES索引");
@@ -90,7 +91,6 @@ public class VideoDeliverConsumer {
               0,
               videoDelivery.getAuthorAvatar());
       if (insertResult != 1) {
-        channel.basicNack(deliveryTag, false, false);
         log.error("用户{}视频{}插入失败", userId, videoId);
         throw new GlobalExceptionHandler.BusinessException("视频插入失败");
       }
@@ -103,7 +103,8 @@ public class VideoDeliverConsumer {
       log.info("用户{}视频{}分发成功", userId, videoId);
     } catch (Exception e) {
       log.error("用户{}视频{}分发失败,异常:{}", userId, videoId, e.getMessage(), e);
-      handleRetry(deliveryTag, channel, retryCount, headers);
+      consumerRetrySupport.handleRetry(
+          deliveryTag, channel, retryCount, MAX_RETRY_COUNT, headers, RETRY_HEADER, "视频分发");
     } finally {
       if (lock.isHeldByCurrentThread() && lock != null) {
         lock.unlock();
@@ -122,36 +123,10 @@ public class VideoDeliverConsumer {
     log.info("分发视频死信消费者,视频URL:{}", videoDelivery.getUrl());
     Long diliverTag = mqMessage.getMessageProperties().getDeliveryTag();
     try {
-      channel.basicAck(diliverTag, false);
+      consumerRetrySupport.ackDeadLetter(diliverTag, channel, "视频分发");
     } catch (Exception e) {
       log.error("死信队列丢弃分发视频失败,视频URL:{}", videoDelivery.getUrl(), e);
       throw new GlobalExceptionHandler.BusinessException("死信队列丢弃分发视频失败");
-    }
-  }
-
-  /**
-   * 处理重试
-   *
-   * @param deliveryTag 消息标签
-   * @param channel 通道
-   * @param retryCount 重试次数
-   * @param headers 消息头
-   */
-  private void handleRetry(
-      Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
-    if (retryCount < MAX_RETRY_COUNT) {
-      headers.put(RETRY_HEADER, retryCount + 1);
-      try {
-        channel.basicNack(deliveryTag, false, true);
-      } catch (Exception e) {
-        log.error("重试收藏消息失败,重试次数:{}", retryCount + 1, e);
-      }
-    } else {
-      try {
-        channel.basicReject(deliveryTag, false);
-      } catch (Exception e) {
-        log.error("收藏消息重试次数超过最大重试次数,已丢弃,重试次数:{}", retryCount, e);
-      }
     }
   }
 

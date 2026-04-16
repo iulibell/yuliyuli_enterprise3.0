@@ -3,7 +3,7 @@ package com.yuliyuli.consumer;
 import cn.ipokerface.snowflake.SnowflakeIdGenerator;
 import com.rabbitmq.client.Channel;
 import com.yuliyuli.config.RabbitMqConfig;
-import com.yuliyuli.dto.query.VideoWrapper;
+import com.yuliyuli.consumer.support.ConsumerRetrySupport;
 import com.yuliyuli.entity.video.Comment;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.mapper.CommentMapper;
@@ -39,11 +39,11 @@ public class CommentConsumer {
 
   @Resource private VideoMapper videoMapper;
 
-  @Resource private VideoWrapper videoWrapper;
-
   @Resource private SnowflakeIdGenerator snowflakeIdGenerator;
 
   @Resource private ElasticsearchOperations elasticsearchOperations;
+
+  @Resource private ConsumerRetrySupport consumerRetrySupport;
 
   @RabbitListener(queues = RabbitMqConfig.COMMENT_QUEUE_NAME)
   public void commentConsumer(Comment comment, Channel channel, Message mqMessage)
@@ -58,7 +58,7 @@ public class CommentConsumer {
     }
     // 重试次数,从消息头中获取重试次数,如果没有则默认0
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
-    Integer retryCount = (Integer) headers.getOrDefault(RETRY_HEADER, 0);
+    int retryCount = consumerRetrySupport.getRetryCount(mqMessage, RETRY_HEADER);
     // 锁: 每个用户评论时,加锁,防止并发评论
     String lockKey = LOCK_KEY_PREFIX + comment.getUserId();
     RLock lock = redissonClient.getLock(lockKey);
@@ -69,7 +69,8 @@ public class CommentConsumer {
       // 尝试加锁,如果3秒内没有加锁成功,则重新放入队列
       boolean isLock = lock.tryLock(LOCK_WAIT, LOCK_RELEASE, TimeUnit.SECONDS);
       if (!isLock) {
-        channel.basicNack(deliveryTag, false, true);
+        consumerRetrySupport.handleRetry(
+            deliveryTag, channel, retryCount, MAX_RETRY_COUNT, headers, RETRY_HEADER, "评论");
         log.info("用户{}评论锁被其他线程占用,已重新放入队列", comment.getUserId());
         return;
       }
@@ -87,7 +88,8 @@ public class CommentConsumer {
       log.info("评论成功,评论ID:{}", commentId);
     } catch (Exception e) {
       log.error("评论消费异常,retry={}", retryCount, e);
-      handleRetry(deliveryTag, channel, retryCount, headers);
+      consumerRetrySupport.handleRetry(
+          deliveryTag, channel, retryCount, MAX_RETRY_COUNT, headers, RETRY_HEADER, "评论");
     } finally {
       if (lock != null && lock.isHeldByCurrentThread()) {
         lock.unlock();
@@ -141,36 +143,10 @@ public class CommentConsumer {
     Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     log.info("死信队列收到失败评论,评论ID:{}", comment.getCommentId());
     try {
-      channel.basicAck(deliveryTag, false);
+      consumerRetrySupport.ackDeadLetter(deliveryTag, channel, "评论");
     } catch (Exception e) {
       log.error("死信队列丢弃失败评论失败,评论ID:{}", comment.getCommentId(), e);
       throw new GlobalExceptionHandler.BusinessException("死信队列丢弃失败评论失败");
-    }
-  }
-
-  /**
-   * 处理重试
-   *
-   * @param deliveryTag 消息标签
-   * @param channel 通道
-   * @param retryCount 重试次数
-   * @param headers 消息头
-   */
-  private void handleRetry(
-      Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
-    if (retryCount < MAX_RETRY_COUNT) {
-      headers.put(RETRY_HEADER, retryCount + 1);
-      try {
-        channel.basicNack(deliveryTag, false, true);
-      } catch (Exception e) {
-        log.error("重试评论消息失败,重试次数:{}", retryCount + 1, e);
-      }
-    } else {
-      try {
-        channel.basicReject(deliveryTag, false);
-      } catch (Exception e) {
-        log.error("评论消息重试次数超过最大重试次数,已丢弃,重试次数:{}", retryCount, e);
-      }
     }
   }
 }

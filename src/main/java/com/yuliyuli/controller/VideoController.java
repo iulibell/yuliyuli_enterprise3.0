@@ -5,9 +5,14 @@ import com.yuliyuli.annotation.OperationLog;
 import com.yuliyuli.annotation.RateLimit;
 import com.yuliyuli.common.CurrentUserHolder;
 import com.yuliyuli.common.Result;
+import com.yuliyuli.common.ServiceResult;
+import com.yuliyuli.dto.request.CommentRequest;
+import com.yuliyuli.dto.request.VideoCollectionRequest;
+import com.yuliyuli.dto.request.VideoLikeRequest;
 import com.yuliyuli.dto.query.CommentWrapper;
 import com.yuliyuli.dto.vo.HotRecommendVideoVO;
 import com.yuliyuli.dto.vo.SearchVideoVO;
+import com.yuliyuli.dto.vo.VideoDetailPageVO;
 import com.yuliyuli.dto.vo.VideoVO;
 import com.yuliyuli.entity.delivery.VideoDeliveryWithoutFile;
 import com.yuliyuli.entity.user.User;
@@ -25,9 +30,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -76,11 +79,7 @@ public class VideoController {
 
   // 检查用户是否登录
   private boolean checkLogin() {
-    User user = CurrentUserHolder.getUser();
-    if (user == null) {
-      return false;
-    }
-    return true;
+    return CurrentUserHolder.getUser() != null;
   }
 
   /**
@@ -92,7 +91,7 @@ public class VideoController {
   @OperationLog(value = "视频投递", type = "VIDEO_UPLOAD")
   @PostMapping("/delivery")
   @Operation(summary = "视频投递")
-  public Result<Object> deliveryVideo(
+  public Result<String> deliveryVideo(
       @RequestParam("file") MultipartFile file,
       @RequestParam("video.title") String title,
       @RequestParam("video.type") String type,
@@ -104,9 +103,6 @@ public class VideoController {
     try {
       // 从登录用户获取userId
       User currentUser = CurrentUserHolder.getUser();
-      if (currentUser == null) {
-        return Result.fail("请完成登录");
-      }
 
       // 保存视频文件，使用视频ID作为文件名
       String videoPath = transferUtil.uploadVideo(file, VIDEOIR);
@@ -124,9 +120,11 @@ public class VideoController {
       videoDelivery.setAuthorName(currentUser.getUsername());
       videoDelivery.setIsDelete(0);
       videoDelivery.setAuthorAvatar(currentUser.getAvatar());
-      String message = videoService.videoDeliver(videoDelivery);
-      log.info("视频投递成功,视频标题:{}, 视频路径:{}, 封面路径:{}", title, videoPath, coverPath);
-      return Result.success(message);
+      ServiceResult result = videoService.videoDeliver(videoDelivery);
+      log.info("视频投递请求处理完成,结果:{},视频标题:{}, 视频路径:{}, 封面路径:{}", result.getMessage(), title, videoPath, coverPath);
+      return toResult(result);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("视频投递失败", e);
       return Result.fail("视频上传失败,请稍后重试");
@@ -137,16 +135,21 @@ public class VideoController {
   @RateLimit(limit = 10, window = 60, key = "like")
   @PostMapping("/like")
   @Operation(summary = "视频点赞")
-  public Result<Object> likeVideo(
+  public Result<String> likeVideo(
       @Parameter(description = "传递的视频对象", required = true) @Validated @RequestBody
-          VideoLike videoLike) {
+          VideoLikeRequest request) {
     if(!checkLogin()){
       return Result.fail("请完成登录");
     }
     try {
-      String message = videoService.videoLike(videoLike);
-      log.info("视频点赞成功,视频ID:{},用户ID:{}", videoLike.getVideoId(), videoLike.getUserId());
-      return Result.success(message);
+      VideoLike videoLike = new VideoLike();
+      videoLike.setVideoId(request.getVideoId());
+      videoLike.setUserId(request.getUserId());
+      ServiceResult result = videoService.videoLike(videoLike);
+      log.info("视频点赞请求处理完成,结果:{},视频ID:{},用户ID:{}", result.getMessage(), videoLike.getVideoId(), videoLike.getUserId());
+      return toResult(result);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("视频点赞失败", e);
       return Result.fail("视频点赞失败,请稍后重试");
@@ -163,16 +166,21 @@ public class VideoController {
   @RateLimit(limit = 10, window = 60, key = "collect")
   @PostMapping("/collect")
   @Operation(summary = "视频收藏")
-  public Result<Object> collectVideo(
+  public Result<String> collectVideo(
       @Parameter(description = "传递的视频对象", required = true) @Validated @RequestBody
-          VideoCollection videoCollect) {
+          VideoCollectionRequest request) {
     if(!checkLogin()){
       return Result.fail("请完成登录");
     }
     try {
-      String message = videoService.videoCollect(videoCollect);
-      log.info("视频收藏成功,视频ID:{},用户ID:{}", videoCollect.getVideoId(), videoCollect.getUserId());
-      return Result.success(message);
+      VideoCollection videoCollect = new VideoCollection();
+      videoCollect.setVideoId(request.getVideoId());
+      videoCollect.setUserId(request.getUserId());
+      ServiceResult result = videoService.videoCollect(videoCollect);
+      log.info("视频收藏请求已受理,结果:{},视频ID:{},用户ID:{}", result.getMessage(), videoCollect.getVideoId(), videoCollect.getUserId());
+      return toResult(result);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("视频收藏失败", e);
       return Result.fail("视频收藏失败,请稍后重试");
@@ -188,16 +196,27 @@ public class VideoController {
   @RateLimit(limit = 10, window = 60, key = "comment")
   @PostMapping("/comment")
   @Operation(summary = "视频评论")
-  public Result<Object> commentVideo(
-      @Parameter(description = "传递的评论对象", required = true) @RequestBody Comment comment) {
+  public Result<String> commentVideo(
+      @Parameter(description = "传递的评论对象", required = true) @Validated @RequestBody
+          CommentRequest request) {
     if(!checkLogin()){
       return Result.fail("请完成登录");
     }
     try {
+      Comment comment = new Comment();
+      comment.setVideoId(request.getVideoId());
+      comment.setAvatar(request.getAvatar());
+      comment.setUsername(request.getUsername());
+      comment.setUserId(request.getUserId());
+      comment.setContent(request.getContent());
+      comment.setParentId(request.getParentId());
+      comment.setCommentId(request.getCommentId());
       log.info("进入视频评论接口");
-      String message = videoService.videoComment(comment);
-      log.info("视频评论成功,视频ID:{},用户ID:{}", comment.getVideoId(), comment.getUserId());
-      return Result.success(message);
+      ServiceResult result = videoService.videoComment(comment);
+      log.info("视频评论请求已受理,结果:{},视频ID:{},用户ID:{}", result.getMessage(), comment.getVideoId(), comment.getUserId());
+      return toResult(result);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("视频评论失败", e);
       return Result.fail("视频评论失败,请稍后重试");
@@ -219,6 +238,8 @@ public class VideoController {
     try {
       Page<VideoVO> page = videoService.getVideoList(pageNum, pageSize);
       return Result.success(page);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("获取视频列表失败", e);
       throw new GlobalExceptionHandler.BusinessException("获取视频列表失败");
@@ -235,13 +256,7 @@ public class VideoController {
   @Operation(summary = "根据视频标题获取相关视频")
   public Result<Page<SearchVideoVO>> getVideoDetail(
       @Parameter(description = "视频标题") @RequestParam String title) {
-    try {
-      Page<SearchVideoVO> page = videoService.getSearchVideoResults(title);
-      return Result.success(page);
-    } catch (Exception e) {
-      log.error("根据标题搜索视频失败", e);
-      throw new GlobalExceptionHandler.BusinessException("根据标题搜索视频失败");
-    }
+    return Result.success(videoService.getSearchVideoResults(title));
   }
 
   /**
@@ -255,7 +270,7 @@ public class VideoController {
    */
   @GetMapping("/clickVideo")
   @Operation(summary = "根据视频ID获取相关视频")
-  public Result<Map<String, Object>> getRelatedVideo(
+  public Result<VideoDetailPageVO> getRelatedVideo(
       @Parameter(description = "视频URL") @RequestParam String videoUrl,
       @Parameter(description = "关注用户ID") @RequestParam Long followUserId,
       @Parameter(description = "粉丝用户ID") @RequestParam Long fanUserId,
@@ -286,6 +301,8 @@ public class VideoController {
     try {
       Page<VideoVO> page = videoService.getVideoAccordingTypeId(typeId, pageNum, pageSize);
       return Result.success(page);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("根据视频类型id获取视频列表失败", e);
       throw new GlobalExceptionHandler.BusinessException("根据视频类型id获取视频列表失败");
@@ -300,18 +317,23 @@ public class VideoController {
    * @param lastId 上一页最后一条评论的Id
    * @return 右侧推荐视频（热门视频），评论列表，是否关注了该作者
    */
-  private Result<Map<String,Object>> clickCommonProcess(String videoUrl, Long followUserId, Long fanUserId, Long lastId){
+  private Result<VideoDetailPageVO> clickCommonProcess(
+      String videoUrl, Long followUserId, Long fanUserId, Long lastId) {
       // 返回的右侧热门推荐视频栏
       List<HotRecommendVideoVO> hotVideoVOList = videoService.getRecommendHotVideo();
       // 分页获取评论列表
       Page<Comment> commentPage = new Page<>(1, 10);
       commentMapper.selectPage(
           commentPage, commentWrapper.getCommentListByCursor(videoUrl, lastId, 10));
-      Map<String, Object> response = new HashMap<>();
-      response.put("hotVideoVOList", hotVideoVOList);
-      // 传递评论列表
-      response.put("commentList", commentPage.getRecords());
-      response.put("isFollow", followMapper.getFollow(followUserId, fanUserId) != null);
+      VideoDetailPageVO response =
+          new VideoDetailPageVO(
+              hotVideoVOList,
+              commentPage.getRecords(),
+              followMapper.getFollow(followUserId, fanUserId) != null);
       return Result.success(response);
+  }
+
+  private Result<String> toResult(ServiceResult result) {
+    return result.isSuccess() ? Result.success(result.getMessage()) : Result.fail(result.getMessage());
   }
 }

@@ -2,6 +2,8 @@ package com.yuliyuli.consumer;
 
 import com.rabbitmq.client.Channel;
 import com.yuliyuli.config.RabbitMqConfig;
+import com.yuliyuli.consumer.support.ConsumerRetrySupport;
+import com.yuliyuli.dto.command.VideoDeleteCommand;
 import com.yuliyuli.exception.GlobalExceptionHandler;
 import jakarta.annotation.Resource;
 import java.util.Map;
@@ -27,38 +29,42 @@ public class VideoDeleteConsumer {
 
   @Resource private RedissonClient redissonClient;
 
+  @Resource private ConsumerRetrySupport consumerRetrySupport;
+
   @RabbitListener(queues = RabbitMqConfig.DELETE_QUEUE_NAME)
-  public void videoDelete(Map<String, Object> map, Channel channel, Message mqMessage)
+  public void videoDelete(VideoDeleteCommand command, Channel channel, Message mqMessage)
       throws Exception {
     Long diliverTag = mqMessage.getMessageProperties().getDeliveryTag();
     // 从消息头中获取重试次数,如果没有则默认0
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
-    Integer retryCount = (Integer) headers.getOrDefault(RETRY_HEADER, 0);
+    int retryCount = consumerRetrySupport.getRetryCount(mqMessage, RETRY_HEADER);
 
-    if (map.get("videoUrl") == null || map.get("userId") == null) {
+    if (command == null || command.getVideoUrl() == null || command.getUserId() == null) {
       log.error("视频删除消息videoUrl或userId为空");
       channel.basicReject(diliverTag, false);
       return;
     }
-    String lockKey = VIDEO_DELETE_LOCK_PREFIX + map.get("videoUrl").toString();
+    String lockKey = VIDEO_DELETE_LOCK_PREFIX + command.getVideoUrl();
     // 获取删除视频锁
     RLock lock = redissonClient.getLock(lockKey);
     try {
       boolean isLock = lock.tryLock(LOCK_WAIT, LOCK_RELEASE, TimeUnit.SECONDS);
       if (!isLock) {
         log.error("视频删除锁已被占用");
-        handleRetry(diliverTag, channel, retryCount, headers);
+        consumerRetrySupport.handleRetry(
+            diliverTag, channel, retryCount, MAX_RETRY_COUNT, headers, RETRY_HEADER, "视频删除");
         return;
       }
       redissonClient
           .getScoredSortedSet(DELAY_KEY)
-          .add(System.currentTimeMillis() + DELAY_TIME, map);
+          .add(System.currentTimeMillis() + DELAY_TIME, command);
       // 播放完成后，手动确认消息
       channel.basicAck(diliverTag, false);
-      log.info("视频删除消息确认成功,视频URL:{}", map.get("videoUrl"));
+      log.info("视频删除消息确认成功,视频URL:{}", command.getVideoUrl());
     } catch (Exception e) {
       log.error("视频删除消费者异常，重试次数:{}", retryCount, e);
-      handleRetry(diliverTag, channel, retryCount, headers);
+      consumerRetrySupport.handleRetry(
+          diliverTag, channel, retryCount, MAX_RETRY_COUNT, headers, RETRY_HEADER, "视频删除");
     } finally {
       if (lock.isHeldByCurrentThread()) {
         lock.unlock();
@@ -67,40 +73,15 @@ public class VideoDeleteConsumer {
   }
 
   @RabbitListener(queues = RabbitMqConfig.DELETE_DEAD_QUEUE_NAME)
-  public void videoDeleteDeadConsumer(Map<String, Object> map, Channel channel, Message mqMessage) {
-    log.info("删除视频死信消费者,视频URL:{}", map.get("videoUrl"));
+  public void videoDeleteDeadConsumer(
+      VideoDeleteCommand command, Channel channel, Message mqMessage) {
+    log.info("删除视频死信消费者,视频URL:{}", command != null ? command.getVideoUrl() : null);
     Long diliverTag = mqMessage.getMessageProperties().getDeliveryTag();
     try {
-      channel.basicAck(diliverTag, false);
+      consumerRetrySupport.ackDeadLetter(diliverTag, channel, "视频删除");
     } catch (Exception e) {
-      log.error("死信队列丢弃删除视频失败,视频URL:{}", map.get("videoUrl"), e);
+      log.error("死信队列丢弃删除视频失败,视频URL:{}", command != null ? command.getVideoUrl() : null, e);
       throw new GlobalExceptionHandler.BusinessException("死信队列丢弃删除视频失败");
-    }
-  }
-
-  /**
-   * 处理重试
-   *
-   * @param deliveryTag 消息标签
-   * @param channel 通道
-   * @param retryCount 重试次数
-   * @param headers 消息头
-   */
-  private void handleRetry(
-      Long deliveryTag, Channel channel, Integer retryCount, Map<String, Object> headers) {
-    if (retryCount < MAX_RETRY_COUNT) {
-      headers.put(RETRY_HEADER, retryCount + 1);
-      try {
-        channel.basicNack(deliveryTag, false, true);
-      } catch (Exception e) {
-        log.error("重试收藏消息失败,重试次数:{}", retryCount + 1, e);
-      }
-    } else {
-      try {
-        channel.basicReject(deliveryTag, false);
-      } catch (Exception e) {
-        log.error("收藏消息重试次数超过最大重试次数,已丢弃,重试次数:{}", retryCount, e);
-      }
     }
   }
 }

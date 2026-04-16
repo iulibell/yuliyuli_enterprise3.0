@@ -7,10 +7,39 @@ on:
     branches: [master, main]
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      workflow: ${{ steps.filter.outputs.workflow }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'src/**'
+              - 'pom.xml'
+              - 'Dockerfile'
+            frontend:
+              - 'yuliyuli-frontend/**'
+            workflow:
+              - '.github/workflows/**'
+              - 'docker-compose.yml'
+              - '.env.example'
+
   # ==================== 测试阶段 ====================
   test-backend:
     name: Test Backend
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.workflow == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,6 +57,8 @@ jobs:
   test-frontend:
     name: Test Frontend
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.workflow == 'true'
     defaults:
       run:
         working-directory: ./yuliyuli-frontend
@@ -52,8 +83,17 @@ jobs:
   build:
     name: Build with Docker Compose
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend]
-    if: github.event_name != 'pull_request'
+    needs: [changes, test-backend, test-frontend]
+    if: |
+      always() &&
+      github.event_name != 'pull_request' &&
+      needs.test-backend.result != 'failure' &&
+      needs.test-frontend.result != 'failure' &&
+      (
+        needs.changes.outputs.backend == 'true' ||
+        needs.changes.outputs.frontend == 'true' ||
+        needs.changes.outputs.workflow == 'true'
+      )
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -72,6 +112,7 @@ jobs:
     needs: build
     # 只在master/main分支且有服务器配置时执行部署
     if: |
+      needs.build.result == 'success' &&
       (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') &&
       secrets.SERVER_HOST != ''
     environment: production
@@ -92,6 +133,17 @@ jobs:
             COMPOSE_FILE="docker-compose.yml"
             ENV_FILE=".env"
 
+            # 预检查运行环境
+            if ! command -v docker >/dev/null 2>&1; then
+              echo "未安装 docker"
+              exit 1
+            fi
+
+            if ! docker compose version >/dev/null 2>&1; then
+              echo "未安装 docker compose"
+              exit 1
+            fi
+
             # 创建项目目录
             mkdir -p $PROJECT_DIR
             cd $PROJECT_DIR
@@ -104,9 +156,10 @@ jobs:
             # 拉取最新代码
             if [ -d ".git" ]; then
               git fetch origin
-              git reset --hard origin/master
+              git checkout "${{ github.ref_name }}"
+              git reset --hard "origin/${{ github.ref_name }}"
             else
-              git clone ${{ github.server_url }}/${{ github.repository }}.git .
+              git clone --branch "${{ github.ref_name }}" ${{ github.server_url }}/${{ github.repository }}.git .
             fi
 
             # 恢复环境变量
@@ -151,26 +204,38 @@ jobs:
   notify:
     name: Send Notification
     runs-on: ubuntu-latest
-    needs: [deploy]
+    needs: [changes, test-backend, test-frontend, build, deploy]
     if: always()
     steps:
       - name: Send success notification
-        if: needs.deploy.result == 'success'
+        if: |
+          needs.test-backend.result != 'failure' &&
+          needs.test-frontend.result != 'failure' &&
+          needs.build.result != 'failure' &&
+          needs.deploy.result == 'success'
         uses: actions/github-script@v7
         with:
           script: |
             console.log('部署成功！')
 
       - name: Send skipped notification
-        if: needs.deploy.result == 'skipped'
+        if: |
+          needs.deploy.result == 'skipped' &&
+          needs.build.result != 'failure' &&
+          needs.test-backend.result != 'failure' &&
+          needs.test-frontend.result != 'failure'
         uses: actions/github-script@v7
         with:
           script: |
             console.log('部署已跳过（未配置服务器信息）')
 
       - name: Send failure notification
-        if: needs.deploy.result == 'failure'
+        if: |
+          needs.test-backend.result == 'failure' ||
+          needs.test-frontend.result == 'failure' ||
+          needs.build.result == 'failure' ||
+          needs.deploy.result == 'failure'
         uses: actions/github-script@v7
         with:
           script: |
-            console.log('部署失败！')
+            console.log('CI/CD 流程失败，请检查测试、构建或部署日志。')

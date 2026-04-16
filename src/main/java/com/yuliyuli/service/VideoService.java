@@ -1,6 +1,7 @@
 package com.yuliyuli.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.yuliyuli.common.ServiceResult;
 import com.yuliyuli.dto.vo.HotRecommendVideoVO;
 import com.yuliyuli.dto.vo.SearchVideoVO;
 import com.yuliyuli.dto.vo.VideoVO;
@@ -17,28 +18,28 @@ public interface VideoService {
    *
    * @param video 视频对象
    */
-  String videoDeliver(VideoDeliveryWithoutFile videoDelivery);
+  ServiceResult videoDeliver(VideoDeliveryWithoutFile videoDelivery);
 
   /**
    * 视频点赞
    *
    * @param videoLike 视频点赞对象
    */
-  String videoLike(VideoLike videoLike);
+  ServiceResult videoLike(VideoLike videoLike);
 
   /**
    * 视频收藏
    *
    * @param videoCollect 视频收藏对象
    */
-  String videoCollect(VideoCollection videoCollect);
+  ServiceResult videoCollect(VideoCollection videoCollect);
 
   /**
    * 视频评论
    *
    * @param comment 视频评论对象
    */
-  String videoComment(Comment comment);
+  ServiceResult videoComment(Comment comment);
 
   /**
    * 获取视频列表
@@ -77,12 +78,12 @@ public interface VideoService {
    *
    * @param videoUrl 视频URL
    */
-  String hotVideoPlay(String videoUrl);
+  ServiceResult hotVideoPlay(String videoUrl);
 
   /**
    * 用户点击普通视频播放视频，发送至消费者进行播放统计
    *
    * @param videoUrl 视频URL
    */
-  String videoPlay(String videoUrl);
+  ServiceResult videoPlay(String videoUrl);
 }

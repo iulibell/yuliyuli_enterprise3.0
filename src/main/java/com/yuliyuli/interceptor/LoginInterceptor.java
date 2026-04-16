@@ -37,7 +37,7 @@ public class LoginInterceptor implements HandlerInterceptor {
       if (authorization != null && authorization.startsWith("Bearer ")) {
         token = authorization.substring(7);
       }
-      log.info("【登录拦截器】校验请求Token,请求路径:{},Token:{}", request.getRequestURI(), token);
+      log.debug("【登录拦截器】校验请求Token,请求路径:{}", request.getRequestURI());
       if (token == null || !jwtUtil.validateToken(token)) {
         return handleError(response, Result.fail(401, "Token校验失败,请重新登录"));
       }
@@ -52,7 +52,7 @@ public class LoginInterceptor implements HandlerInterceptor {
       try {
         Claims claims = jwtUtil.parseToken(token);
         request.setAttribute("userId", claims.get("userId"));
-        log.info("【登录拦截器】Token校验成功,用户ID:{}，请求路径:{}", claims.get("userId"), request.getRequestURI());
+        log.debug("【登录拦截器】Token校验成功,用户ID:{}，请求路径:{}", claims.get("userId"), request.getRequestURI());
         return true;
       } catch (Exception e) {
         log.error("【登录拦截器】解析Token失败,请求路径:{}，异常信息:{}", request.getRequestURI(), e.getMessage(), e);

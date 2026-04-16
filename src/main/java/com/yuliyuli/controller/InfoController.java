@@ -1,14 +1,19 @@
 package com.yuliyuli.controller;
 
 import com.yuliyuli.common.Result;
+import com.yuliyuli.common.ServiceResult;
+import com.yuliyuli.dto.request.FollowRequest;
+import com.yuliyuli.dto.request.VideoDeleteRequest;
+import com.yuliyuli.dto.vo.UserProfileVO;
 import com.yuliyuli.dto.vo.VideoVO;
+import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.service.InfoService;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import java.util.List;
-import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,12 +41,7 @@ public class InfoController {
     if (userId == null) {
       return Result.fail("该作者不存在!");
     }
-    try {
-      return Result.success(infoService.getAuthorPageVideo(userId));
-    } catch (Exception e) {
-      log.error("获取作者页面视频失败", e);
-      return Result.fail("请重试打开该页面!");
-    }
+    return Result.success(infoService.getAuthorPageVideo(userId));
   }
 
   /**
@@ -51,16 +51,11 @@ public class InfoController {
    * @return 用户信息
    */
   @GetMapping("/userInfo/{userId}")
-  public Result<Object> getUserInfo(@PathVariable Long userId) {
+  public Result<UserProfileVO> getUserInfo(@PathVariable Long userId) {
     if (userId == null) {
       return Result.fail("该用户不存在!");
     }
-    try {
-      return Result.success(infoService.getUserInfo(userId));
-    } catch (Exception e) {
-      log.error("获取用户信息失败", e);
-      return Result.fail("请重试打开该页面!");
-    }
+    return Result.success(infoService.getUserInfo(userId));
   }
 
   /**
@@ -70,28 +65,20 @@ public class InfoController {
    * @return 用户信息
    */
   @GetMapping("/userInfoByName/{authorName}")
-  public Result<Object> getUserInfoByName(@PathVariable String authorName) {
+  public Result<UserProfileVO> getUserInfoByName(@PathVariable String authorName) {
     if (authorName == null || authorName.isEmpty()) {
       return Result.fail("该作者不存在!");
     }
-    try {
-      return Result.success(infoService.getUserInfoByAuthorName(authorName));
-    } catch (Exception e) {
-      log.error("获取用户信息失败", e);
-      return Result.fail("请重试打开该页面!");
-    }
+    return Result.success(infoService.getUserInfoByAuthorName(authorName));
   }
 
   @PostMapping("/videoDelete")
-  public Result<Object> videoDelete(@RequestBody Map<String, Object> params) {
+  public Result<String> videoDelete(@Validated @RequestBody VideoDeleteRequest request) {
     try {
-      String videoUrl = (String) params.get("videoUrl");
-      Long userId = Long.valueOf(params.get("userId").toString());
-      String result = infoService.videoDelete(videoUrl, userId);
-      if (result.equals("删除视频成功")) {
-        return Result.success("删除成功");
-      }
-      return Result.fail(result);
+      ServiceResult result = infoService.videoDelete(request.getVideoUrl(), request.getUserId());
+      return toResult(result, "删除成功");
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("删除视频失败", e);
       return Result.fail("请重试删除该视频!");
@@ -99,28 +86,24 @@ public class InfoController {
   }
 
   @PostMapping("/follow")
-  public Result<String> userfollow(@RequestBody Map<String, Object> params) {
+  public Result<String> userfollow(@Validated @RequestBody FollowRequest request) {
     try {
-      String operation = (String) params.get("operation");
-      Long followUserId = (Long) params.get("followUserId");
-      Long userId = (Long) params.get("userId");
-
+      String operation = request.getOperation();
       if ("unfollow".equals(operation)) {
-        String result = infoService.userUnfollow(followUserId, userId);
-        if ("取消关注成功".equals(result)) {
-          return Result.success("取消关注成功!");
-        }
-        return Result.fail(result);
-      } else {
-        String result = infoService.userFollow(followUserId, userId);
-        if ("关注成功".equals(result)) {
-          return Result.success("关注成功!");
-        }
-        return Result.fail(result);
+        ServiceResult result = infoService.userUnfollow(request.getFollowUserId(), request.getUserId());
+        return toResult(result, "取消关注成功!");
       }
+      ServiceResult result = infoService.userFollow(request.getFollowUserId(), request.getUserId());
+      return toResult(result, "关注成功!");
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("关注用户失败", e);
       return Result.fail("请重试关注该用户!");
     }
+  }
+
+  private Result<String> toResult(ServiceResult result, String successMessage) {
+    return result.isSuccess() ? Result.success(successMessage) : Result.fail(result.getMessage());
   }
 }

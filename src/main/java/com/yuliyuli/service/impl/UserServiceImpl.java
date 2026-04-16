@@ -2,6 +2,8 @@ package com.yuliyuli.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yuliyuli.common.CurrentUserHolder;
+import com.yuliyuli.common.LoginServiceResult;
+import com.yuliyuli.common.ServiceResult;
 import com.yuliyuli.dto.query.UserWrapper;
 import com.yuliyuli.dto.vo.LoginVO;
 import com.yuliyuli.entity.user.ExistingPhone;
@@ -33,12 +35,12 @@ import org.springframework.util.StringUtils;
 
 @Service
 @Slf4j
-public class UserServiceImpl implements UserService { 
+public class UserServiceImpl implements UserService {
 
   // Redis验证码缓存前缀
   private static final String SMS_CODE_PREFIX = "register:code:";
   // 验证码有效期5分钟
-  private static final long SMS_CODE_EXPIRE = 1;
+  private static final long SMS_CODE_EXPIRE_MINUTES = 5;
   // 用户登录缓存前缀
   private static final String LOGIN_TOKEN_PREFIX = "login:token:";
 
@@ -60,94 +62,92 @@ public class UserServiceImpl implements UserService {
 
   @Resource private ElasticsearchOperations elasticsearchOperations;
 
-  // 用于判断输入时的验证码是否正确
-  String registerCode = "";
-  String username = "";
-
-  public LoginVO login(String account, String password) {
+  public LoginServiceResult login(String account, String password) {
     // 参数校验
     if (!StringUtils.hasText(account) || !StringUtils.hasText(password)) {
-      return null;
+      return LoginServiceResult.fail("账号或密码不能为空");
     }
-    if (password.length() < 8 || password.length() > 16) {
-      return null;
+    if (password.length() < 6 || password.length() > 12) {
+      return LoginServiceResult.fail("账号或密码错误!");
     }
     LambdaQueryWrapper<User> queryWrapper = userWrapper.buildUserByAccount(account);
     User user = userMapper.selectOne(queryWrapper);
     if (user == null) {
       log.error("账号不存在,account: {}", account);
-      return null;
+      return LoginServiceResult.fail("账号或密码错误!");
     }
     if (!passwordEncoder.matches(password, user.getPassword())) {
       log.error("密码错误,account: {}", account);
-      return null;
+      return LoginServiceResult.fail("账号或密码错误!");
     }
     try {
       String token = jwtUtil.generateToken(user.getUserId());
-      log.info("登录成功,token: {}", token);
+      log.info("登录成功,userId: {}", user.getUserId());
       String redisKey = LOGIN_TOKEN_PREFIX + token;
       // 保存用户信息到 Redis
       redisTemplate.opsForValue().set(redisKey, user, 1, TimeUnit.HOURS);
       LoginVO loginVO = new LoginVO(token, user);
-      return loginVO;
+      return LoginServiceResult.success(loginVO);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("生成token异常", e);
-      return null;
+      return LoginServiceResult.fail("登录失败,请稍后重试");
     }
   }
 
   @Override
-  public String getCode(String phone) {
+  public ServiceResult getCode(String phone) {
     // 参数校验
     if (!StringUtils.hasText(phone) || phone.length() != 11) {
-      return "请输入有效的11位手机号";
+      return ServiceResult.fail("请输入有效的11位手机号");
     }
     LambdaQueryWrapper<ExistingPhone> queryWrapper = userWrapper.buildUserByPhone(phone);
     ExistingPhone existPhone = existPhoneMapper.selectOne(queryWrapper);
     if (existPhone == null) {
       log.error("手机号不存在,phone: {}", phone);
-      return "手机号不存在";
+      return ServiceResult.fail("手机号不存在");
     }
-    username = existPhone.getUsername();
     // 3. 生成6位随机验证码
     try {
       String code = String.valueOf((int) (Math.random() * 900000 + 100000));
       String redisKey = SMS_CODE_PREFIX + phone;
       // 4. 保存验证码到Redis（替换内存存储，解决多线程问题）
-      redisTemplate.opsForValue().set(redisKey, code, SMS_CODE_EXPIRE, TimeUnit.MINUTES);
-      System.out.println("验证码：" + code);
-      log.info("手机号{}生成验证码：{}，有效期{}分钟", phone, code, SMS_CODE_EXPIRE);
-      return "验证码发送成功!";
+      redisTemplate.opsForValue().set(redisKey, code, SMS_CODE_EXPIRE_MINUTES, TimeUnit.MINUTES);
+      log.info("手机号{}验证码生成成功，有效期{}分钟", phone, SMS_CODE_EXPIRE_MINUTES);
+      return ServiceResult.success("验证码发送成功!");
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("生成验证码异常", e);
-      return "获取验证码失败,请稍后重试";
+      return ServiceResult.fail("获取验证码失败,请稍后重试");
     }
   }
 
   @Override
   @Transactional(rollbackFor = Exception.class)
-  public String register(String phone, String code, String password) {
+  public ServiceResult register(String phone, String code, String password) {
     // 1. 参数校验
     if (!StringUtils.hasText(phone)
         || !StringUtils.hasText(code)
         || !StringUtils.hasText(password)) {
-      return "手机号、验证码、密码不能为空";
+      return ServiceResult.fail("手机号、验证码、密码不能为空");
     }
     if (password.length() < 6 || password.length() > 12) {
-      return "密码长度必须大于等于6位且小于等于12位";
+      return ServiceResult.fail("密码长度必须大于等于6位且小于等于12位");
     }
     if (!phone.matches("^1[3-9]\\d{9}$")) {
-      return "请输入有效的11位手机号";
+      return ServiceResult.fail("请输入有效的11位手机号");
     }
 
     // 2. 从Redis获取验证码并校验
     String redisKey = SMS_CODE_PREFIX + phone;
     String cacheCode = (String) redisTemplate.opsForValue().get(redisKey);
     if (cacheCode == null) {
-      return "验证码已过期，请重新获取";
+      return ServiceResult.fail("验证码已过期，请重新获取");
     }
     if (!code.equals(cacheCode)) {
-      return "验证码错误!";
+      return ServiceResult.fail("验证码错误!");
     }
 
     try {
@@ -163,6 +163,9 @@ public class UserServiceImpl implements UserService {
       // 从ExistPhone获取用户名
       LambdaQueryWrapper<ExistingPhone> phoneWrapper = userWrapper.buildUserByPhone(phone);
       ExistingPhone existPhone = existPhoneMapper.selectOne(phoneWrapper);
+      if (existPhone == null) {
+        return ServiceResult.fail("手机号不存在");
+      }
       user.setUsername(existPhone.getUsername());
 
       userMapper.insert(user);
@@ -176,7 +179,9 @@ public class UserServiceImpl implements UserService {
       // 6. 注册成功后删除验证码
       redisTemplate.delete(redisKey);
 
-      return "注册成功!";
+      return ServiceResult.success("注册成功!");
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("用户{}注册失败", phone, e);
       throw new GlobalExceptionHandler.BusinessException("注册失败：" + e.getMessage());
@@ -185,11 +190,11 @@ public class UserServiceImpl implements UserService {
 
   @Override
   @Transactional(rollbackFor = Exception.class)
-  public String modifyInfo(short gender, Date birthday, String sign) {
+  public ServiceResult modifyInfo(short gender, Date birthday, String sign) {
     // 从 UserHolder 获取当前登录用户
     User user = CurrentUserHolder.getUser();
     if (user == null) {
-      return "请先完成登录!";
+      return ServiceResult.fail("请先完成登录!");
     }
     Long userId = user.getUserId();
     try {
@@ -200,7 +205,9 @@ public class UserServiceImpl implements UserService {
         birthdayStr = sdf.format(birthday);
       }
       userInfoMapper.updateUserInfo(userId, gender, birthdayStr, sign);
-      return "修改成功!";
+      return ServiceResult.success("修改成功!");
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("用户{}修改信息失败", userId, e);
       throw new GlobalExceptionHandler.BusinessException("修改信息失败：" + e.getMessage());
@@ -209,7 +216,7 @@ public class UserServiceImpl implements UserService {
 
   @Override
   @Transactional(rollbackFor = Exception.class)
-  public String modifyAvatar(String avatarUrl, Long userId) {
+  public ServiceResult modifyAvatar(String avatarUrl, Long userId) {
     try {
       // 1. 更新数据库用户头像
       userMapper.updateAvatar(userId, avatarUrl);
@@ -220,7 +227,9 @@ public class UserServiceImpl implements UserService {
       // 3. 同步更新 ES 中头像（直接调用你本类的方法）
       syncUserInfoToVideoEs(userId, null, avatarUrl);
 
-      return "修改成功!";
+      return ServiceResult.success("修改成功!");
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("用户{}修改头像失败", userId, e);
       throw new GlobalExceptionHandler.BusinessException("修改头像失败：" + e.getMessage());

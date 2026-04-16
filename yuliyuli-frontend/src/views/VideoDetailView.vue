@@ -394,7 +394,7 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, onMounted, watch } from 'vue';
+  import { ref, onMounted, onUnmounted, watch } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
   import axios from 'axios';
   import { ElMessage } from 'element-plus';
@@ -478,6 +478,8 @@
   const showSearchDropdown = ref<boolean>(false);
   const searchSuggestions = ref<string[]>([]);
   const hotSearchKeywords = ref<Array<{ keyword: string; hot?: string }>>([]);
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let searchAbortController: AbortController | null = null;
 
   // 关注状态
   const isFollowing = ref<boolean>(false);
@@ -1107,6 +1109,15 @@
     fetchVideoData();
   });
 
+  onUnmounted(() => {
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
+    }
+    if (searchAbortController) {
+      searchAbortController.abort();
+    }
+  });
+
   watch(
     () => route.query.video,
     () => {
@@ -1170,32 +1181,52 @@
     }
   };
 
-  const handleSearchInput = async () => {
-    if (searchQuery.value.trim()) {
-      try {
-        const response = await axios.get('/api/search/video', {
-          params: { keyword: searchQuery.value },
+  const requestSearchSuggestions = async (keyword: string) => {
+    if (searchAbortController) {
+      searchAbortController.abort();
+    }
+    searchAbortController = new AbortController();
+    try {
+      const response = await axios.get('/api/search/video', {
+        params: { keyword },
+        signal: searchAbortController.signal,
+      });
+      if (response.data && response.data.code === 200) {
+        searchSuggestions.value = response.data.data.flatMap((item: any) => {
+          if (item.title) {
+            return [item.title];
+          } else if (item.videoDocuments && item.videoDocuments.length > 0) {
+            return item.videoDocuments.map((doc: any) => doc.title);
+          }
+          return [];
         });
-        if (response.data && response.data.code === 200) {
-          console.log('搜索建议响应:', response.data.data);
-          // 处理搜索建议 - 后端返回的是SearchVideoVO列表
-          searchSuggestions.value = response.data.data.flatMap((item: any) => {
-            if (item.title) {
-              // 直接是视频对象
-              return [item.title];
-            } else if (item.videoDocuments && item.videoDocuments.length > 0) {
-              // 包含videoDocuments数组
-              return item.videoDocuments.map((doc: any) => doc.title);
-            }
-            return [];
-          });
-        }
-      } catch (error) {
+      }
+    } catch (error: any) {
+      if (error?.name !== 'CanceledError' && error?.code !== 'ERR_CANCELED') {
         console.error('获取搜索建议失败:', error);
       }
-    } else {
-      searchSuggestions.value = [];
     }
+  };
+
+  const handleSearchInput = () => {
+    const keyword = searchQuery.value.trim();
+    if (!keyword) {
+      if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = null;
+      }
+      if (searchAbortController) {
+        searchAbortController.abort();
+      }
+      searchSuggestions.value = [];
+      return;
+    }
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
+    }
+    searchDebounceTimer = setTimeout(() => {
+      requestSearchSuggestions(keyword);
+    }, 300);
   };
 
   const selectSuggestion = (suggestion: string) => {

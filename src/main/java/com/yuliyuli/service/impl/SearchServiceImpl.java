@@ -3,6 +3,7 @@ package com.yuliyuli.service.impl;
 import com.yuliyuli.dto.query.VideoWrapper;
 import com.yuliyuli.dto.vo.SearchVideoVO;
 import com.yuliyuli.entity.document.VideoDocument;
+import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.init.SearchVideoInit;
 import com.yuliyuli.mapper.VideoMapper;
 import com.yuliyuli.repository.VideoRepository;
@@ -37,9 +38,11 @@ public class SearchServiceImpl implements SearchService {
       List<SearchVideoVO> topTenVOList =
           VideoConvertUtil.convertVideoDocumentListToSearchVideoVOList(topTenVideo);
       return topTenVOList;
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("获取热门视频失败", e);
-      throw new IllegalArgumentException("获取热门视频失败");
+      throw new GlobalExceptionHandler.BusinessException("获取热门视频失败");
     }
   }
 
@@ -53,9 +56,11 @@ public class SearchServiceImpl implements SearchService {
       List<SearchVideoVO> videoVOList =
           VideoConvertUtil.convertVideoDocumentListToSearchVideoVOList(videoDocuments);
       return videoVOList;
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("根据标题建议查询视频失败", e);
-      throw new IllegalArgumentException("根据标题建议查询视频失败");
+      throw new GlobalExceptionHandler.BusinessException("根据标题建议查询视频失败");
     }
   }
 }

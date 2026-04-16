@@ -1,8 +1,8 @@
 package com.yuliyuli.service;
 
+import com.yuliyuli.common.LoginServiceResult;
+import com.yuliyuli.common.ServiceResult;
 import java.util.Date;
-
-import com.yuliyuli.dto.vo.LoginVO;
 
 // 用户服务接口
 public interface UserService {
@@ -13,7 +13,7 @@ public interface UserService {
    * @param password 密码
    * @return 用户信息
    */
-  LoginVO login(String account, String password);
+  LoginServiceResult login(String account, String password);
 
   /**
    * 注册
@@ -21,7 +21,7 @@ public interface UserService {
    * @param phone 手机号
    * @return 用户信息
    */
-  String getCode(String phone);
+  ServiceResult getCode(String phone);
 
   /**
    * 注册
@@ -30,7 +30,7 @@ public interface UserService {
    * @param code 验证码
    * @return 用户信息
    */
-  String register(String phone, String code, String password);
+  ServiceResult register(String phone, String code, String password);
 
   /**
    * 修改信息
@@ -40,7 +40,7 @@ public interface UserService {
    * @param sign 签名
    * @return 用户信息
    */
-  String modifyInfo(short gender, Date birthday, String sign);
+  ServiceResult modifyInfo(short gender, Date birthday, String sign);
 
   /**
    * 修改用户头像
@@ -49,5 +49,5 @@ public interface UserService {
    * @param userId 用户ID
    * @return 修改结果
    */
-  String modifyAvatar(String avatarUrl, Long userId);
+  ServiceResult modifyAvatar(String avatarUrl, Long userId);
 }

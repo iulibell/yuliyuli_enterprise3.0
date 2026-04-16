@@ -3,24 +3,25 @@ package com.yuliyuli.controller;
 import com.yuliyuli.annotation.OperationLog;
 import com.yuliyuli.annotation.RateLimit;
 import com.yuliyuli.common.CurrentUserHolder;
+import com.yuliyuli.common.LoginServiceResult;
 import com.yuliyuli.common.Result;
+import com.yuliyuli.common.ServiceResult;
+import com.yuliyuli.dto.request.GetCodeRequest;
+import com.yuliyuli.dto.request.LoginRequest;
+import com.yuliyuli.dto.request.ModifyUserInfoRequest;
+import com.yuliyuli.dto.request.RegisterRequest;
 import com.yuliyuli.dto.vo.LoginVO;
-import com.yuliyuli.entity.user.ExistingPhone;
 import com.yuliyuli.entity.user.User;
-import com.yuliyuli.entity.user.UserInfo;
+import com.yuliyuli.exception.GlobalExceptionHandler;
 import com.yuliyuli.service.UserService;
-import com.yuliyuli.util.JwtUtil;
 import com.yuliyuli.util.TransferUtil;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
-import java.util.HashMap;
-import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,11 +43,7 @@ public class UserController {
 
   @Resource private UserService userService;
 
-  @Resource private JwtUtil jwtUtil;
-
   @Resource private TransferUtil transferUtil;
-
-  @Resource private ElasticsearchOperations elasticsearchOperations;
 
   /**
    * 用户登录接口
@@ -58,22 +55,19 @@ public class UserController {
   @RateLimit(key = "login", limit = 10, window = 60)
   @Operation(summary = "用户登录")
   @PostMapping("/login")
-  public Result<Object> login(
+  public Result<LoginVO> login(
       @Parameter(description = "登录参数（账号+密码）", required = true) @Validated @RequestBody
-          User loginDto) {
+          LoginRequest loginDto) {
     log.info("【用户登录】手机号：{}", loginDto.getPhone());
     try {
-      LoginVO loginVO = userService.login(loginDto.getPhone(), loginDto.getPassword());
-      if (loginVO == null) {
-        log.info("【用户登录】账号或密码错误!");
-        return Result.fail("账号或密码错误!");
+      LoginServiceResult result = userService.login(loginDto.getPhone(), loginDto.getPassword());
+      if (!result.isSuccess()) {
+        log.info("【用户登录】失败: {}", result.getMessage());
+        return Result.fail(result.getMessage());
       }
-      // 生成token
-      String token = jwtUtil.generateToken(loginVO.getUser().getUserId());
-      Map<String, Object> map = new HashMap<>();
-      map.put("token", token);
-      map.put("user", loginVO.getUser());
-      return Result.success(map);
+      return Result.success(result.getData());
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("登录异常!", e);
       return Result.fail("登录失败,请稍后重试");
@@ -89,15 +83,19 @@ public class UserController {
   @RateLimit(key = "getCode", limit = 5, window = 60)
   @Operation(summary = "校验模块")
   @PostMapping("/getCode")
-  public Result<Object> getCode(
+  public Result<String> getCode(
       @Parameter(description = "校验参数（手机号）", required = true) @Validated @RequestBody
-          ExistingPhone existPhone) {
-    String phone = existPhone.getPhone();
-    log.info("手机号：{}", existPhone.getPhone());
+          GetCodeRequest request) {
+    String phone = request.getPhone();
+    log.info("手机号：{}", phone);
     try {
-      String message = userService.getCode(phone);
-      log.info("验证码发送成功");
-      return Result.success(message);
+      ServiceResult result = userService.getCode(phone);
+      if (result.isSuccess()) {
+        log.info("验证码发送成功");
+      }
+      return toResult(result);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("获取验证码异常!", e);
       return Result.fail("获取验证码失败,请稍后重试");
@@ -115,26 +113,16 @@ public class UserController {
   @RateLimit(key = "register", limit = 5, window = 60)
   @Operation(summary = "注册模块")
   @PostMapping("/register")
-  public Result<Object> register(
+  public Result<String> register(
       @Parameter(description = "注册参数（账号+密码）", required = true) @Validated @RequestBody
-          User registerDto,
+          RegisterRequest registerDto,
       @Parameter(description = "校验参数（验证码）", required = true) @RequestParam String code) {
     try {
-      String message =
+      ServiceResult result =
           userService.register(registerDto.getPhone(), code, registerDto.getPassword());
-      if (message == null) {
-        return Result.fail("验证码错误!");
-      }
-      if (message.equals("请输入有效的11位手机号")) {
-        return Result.fail(message);
-      }
-      if (message.equals("密码长度必须大于等于6位且小于等于12位")) {
-        return Result.fail(message);
-      }
-      if (message.equals("手机号、验证码、密码不能为空")) {
-        return Result.fail(message);
-      }
-      return Result.success(message);
+      return toResult(result);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("【注册模块】注册异常!", e);
       return Result.fail("注册失败,请稍后重试");
@@ -149,18 +137,17 @@ public class UserController {
    */
   @Operation(summary = "修改模块")
   @PostMapping("/modifyInfo")
-  public Result<Object> modifyInfo(
+  public Result<String> modifyInfo(
       @Parameter(description = "修改参数（性别+生日+签名）", required = true) @Validated @RequestBody
-          UserInfo userInfoDto) {
+          ModifyUserInfoRequest userInfoDto) {
     // 修改用户信息
     try {
-      String message =
+      ServiceResult result =
           userService.modifyInfo(
               userInfoDto.getGender(), userInfoDto.getBirthday(), userInfoDto.getSign());
-      if (message == null) {
-        return Result.fail("修改失败!");
-      }
-      return Result.success(message);
+      return toResult(result);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("【修改模块】修改异常!", e);
       return Result.fail("修改失败,请稍后重试");
@@ -175,20 +162,29 @@ public class UserController {
    */
   @Operation(summary = "修改模块")
   @PostMapping("/modifyAvatar")
-  public Result<Object> modifyAvatar(@RequestParam MultipartFile avatar) {
+  public Result<String> modifyAvatar(@RequestParam MultipartFile avatar) {
     try {
       User currentUser = CurrentUserHolder.getUser();
+      if (currentUser == null) {
+        return Result.fail("请先完成登录!");
+      }
       Long userId = currentUser.getUserId();
       // 上传头像,返回头像URL
       String avatarUrl = transferUtil.uploadAvatar(avatar, avatarPath);
-      String message = userService.modifyAvatar(avatarUrl, userId);
-      if (message.equals("修改成功!")) {
+      ServiceResult result = userService.modifyAvatar(avatarUrl, userId);
+      if (result.isSuccess()) {
         return Result.success(avatarUrl);
       }
-      return Result.fail("修改头像失败");
+      return Result.fail(result.getMessage());
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
     } catch (Exception e) {
       log.error("修改头像失败", e);
       return Result.fail("请重试打开该页面!");
     }
+  }
+
+  private Result<String> toResult(ServiceResult result) {
+    return result.isSuccess() ? Result.success(result.getMessage()) : Result.fail(result.getMessage());
   }
 }

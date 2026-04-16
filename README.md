@@ -1,273 +1,301 @@
 # YuliYuli 视频分享平台
 
-一个基于 Spring Boot + Vue3 的视频分享平台，类似B站的视频社区系统。
+一个基于 `Spring Boot + Vue 3` 的前后端分离视频平台，覆盖视频投稿、播放、搜索、点赞、收藏、评论、关注等核心业务场景。
 
-## 项目简介
+> 项目定位：个人全栈实战项目，重点偏后端工程能力建设。  
+> 项目目标：不只完成业务闭环，还通过缓存、消息队列、搜索引擎、异步任务和持续重构来提升系统性能与可维护性。
 
-YuliYuli 是一个视频分享平台，支持视频投稿、播放、搜索等核心功能。项目采用前后端分离架构，使用主流技术栈实现。
+## 项目概览
+
+YuliYuli 模拟一个轻量视频社区，主要包含：
+
+- 用户注册、登录、资料维护
+- 视频投稿与展示
+- 视频播放与播放量统计
+- 点赞、收藏、评论、关注
+- 热门推荐与搜索建议
+- Docker Compose 部署与 GitHub Actions CI/CD
+
+这个项目的重点不只是“功能做出来”，而是围绕真实业务链路逐步完成：
+
+- 中间件接入
+- 缓存与异步削峰
+- 搜索能力建设
+- 后端结构重构
+- CI/CD 与交付文档完善
 
 ## 技术栈
 
 ### 后端
 
-| 技术 | 版本 | 说明 |
-|------|------|------|
-| Spring Boot | 3.2.5 | 基础框架 |
-| MyBatis-Plus | 3.5.5 | ORM框架 |
-| MySQL | 8.0+ | 关系型数据库 |
-| Redis | 7.0+ | 缓存数据库 |
-| Elasticsearch | 8.11+ | 搜索引擎 |
-| RabbitMQ | 3.12+ | 消息队列 |
-| JWT | 0.12.3 | 身份认证 |
-| Redisson | 3.27.0 | Redis客户端 |
+- `Spring Boot 3.2.5`
+- `Spring Security`
+- `MyBatis-Plus 3.5.5`
+- `MySQL 8.0+`
+- `Redis 7+`
+- `Redisson 3.27.x`
+- `RabbitMQ 3.12+`
+- `Elasticsearch 8.11+`
+- `JWT 0.12.3`
+- `Spring Boot Actuator`
 
 ### 前端
 
-| 技术 | 版本 | 说明 |
-|------|------|------|
-| Vue | 3.4.21 | 前端框架 |
-| TypeScript | 5.4.5 | 类型语言 |
-| Element Plus | 2.6.3 | UI组件库 |
-| Axios | 1.6.8 | HTTP客户端 |
-| Pinia | 2.1.7 | 状态管理 |
+- `Vue 3`
+- `TypeScript`
+- `Vite`
+- `Element Plus`
+- `Axios`
+- `Pinia`
 
-## 项目结构
+### 工程化
 
-```
-yuliyuli_enterprise/
-├── src/main/java/com/yuliyuli/
-│   ├── annotation/          # 自定义注解
-│   │   ├── Desensitize.java     # 数据脱敏注解
-│   │   ├── OperationLog.java    # 操作日志注解
-│   │   └── RateLimit.java       # 限流注解
-│   ├── aspect/              # AOP切面
-│   │   ├── OperationLogAspect.java  # 操作日志切面
-│   │   └── RateLimitAspect.java     # 限流切面
-│   ├── common/              # 公共类
-│   │   ├── CurrentUserHolder.java   # 当前用户持有者
-│   │   └── Result.java              # 统一响应结果
-│   ├── config/              # 配置类
-│   │   ├── CacheConfig.java         # Spring Cache配置
-│   │   ├── DesensitizeSerializer.java # 脱敏序列化器
-│   │   ├── RabbitMqConfig.java      # RabbitMQ配置
-│   │   ├── RedisConfig.java         # Redis配置
-│   │   └── WebConfig.java           # Web配置
-│   ├── controller/          # 控制器层
-│   │   ├── InfoController.java
-│   │   ├── SearchController.java
-│   │   ├── UserController.java
-│   │   └── VideoController.java
-│   ├── document/            # ES文档
-│   │   └── VideoDocument.java
-│   ├── dto/                 # 数据传输对象
-│   │   ├── query/           # 查询包装器
-│   │   └── vo/              # 视图对象
-│   ├── entity/              # 实体类
-│   ├── enums/               # 枚举类
-│   │   └── DesensitizeType.java
-│   ├── exception/           # 异常处理
-│   │   └── GlobalExceptionHandler.java
-│   ├── init/                # 初始化类
-│   │   ├── BloomFilterInit.java     # 布隆过滤器初始化
-│   │   ├── HotUserInit.java         # 热门用户初始化
-│   │   ├── SearchVideoInit.java     # 搜索视频初始化
-│   │   └── VideoInfoInit.java       # 视频信息初始化
-│   ├── interceptor/         # 拦截器
-│   │   └── LoginInterceptor.java
-│   ├── mapper/              # 数据访问层
-│   ├── repository/          # ES仓库
-│   ├── service/             # 服务层
-│   │   ├── impl/            # 服务实现
-│   │   ├── InfoService.java
-│   │   ├── SearchService.java
-│   │   ├── UserService.java
-│   │   └── VideoService.java
-│   ├── util/                # 工具类
-│   │   ├── BloomFilterUtil.java
-│   │   ├── DesensitizeUtil.java
-│   │   ├── JwtUtil.java
-│   │   ├── TransferUtil.java
-│   │   └── VideoConvertUtil.java
-│   └── YuliyuliEnterpriseApplication.java
-├── src/main/resources/
-│   └── application.yml
-└── yuliyuli-frontend/       # 前端项目
-    ├── src/
-    ├── public/
-    └── package.json
-```
+- `Docker`
+- `Docker Compose`
+- `GitHub Actions`
 
 ## 核心功能
 
 ### 用户模块
-- 用户注册/登录（JWT认证）
-- 用户信息管理
+
+- 用户注册 / 登录
+- JWT 登录态校验
+- 用户信息获取与修改
 - 头像上传
-- 关注/粉丝功能
+- 用户关注 / 取关
 
 ### 视频模块
-- 视频投稿（支持分片上传）
-- 视频播放
-- 视频点赞/收藏/评论
-- 视频搜索（Elasticsearch）
+
+- 视频投稿
+- 分类分页加载
+- 视频播放统计
+- 视频点赞 / 收藏 / 评论
+- 视频删除
+
+### 搜索与推荐
+
+- Elasticsearch 视频搜索
+- 搜索建议
 - 热门视频推荐
 
-### 其他功能
-- 接口限流（RateLimit）
-- 数据脱敏（手机号、密码）
-- 操作日志记录（AOP）
-- 事务管理
-- Spring Cache缓存
+### 工程能力
 
-### 环境要求
+- 全局异常处理
+- 限流切面
+- 操作日志切面
+- 缓存与异步任务
+- Docker 化部署
+- GitHub Actions CI/CD
 
-- JDK 17+
-- MySQL 8.0+
-- Redis 7.0+
-- Elasticsearch 8.11+
-- RabbitMQ 3.12+
-- Node.js 18+
+## 项目亮点
 
-### 后端启动
+- **中间件使用贴合业务**：不是简单堆技术，而是围绕“播放、互动、推荐、搜索”这些场景使用 `Redis / RabbitMQ / Elasticsearch`
+- **有真实的后端重构过程**：围绕鉴权边界、任务拆分、异步链路、service 返回风格做过多轮整理
+- **兼顾性能与可维护性**：既做缓存、批量落库、防抖，也做 DTO 化、consumer 公共模板、README/CI/CD 完善
+- **可作为实习项目讲解**：既能讲功能实现，也能讲优化、重构、设计取舍
 
-1. 创建数据库
+## 系统设计思路
 
-<details>
-<summary>点击查看完整SQL</summary>
+### 1. 为什么使用 Redis
 
-```sql
-CREATE DATABASE yuliyuli_enterprise CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+Redis 在项目中承担两类职责：
 
-CREATE TABLE `comment` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `video_id` varchar(255) NOT NULL COMMENT '视频ID',
-  `user_id` bigint NOT NULL COMMENT '用户ID',
-  `content` varchar(500) NOT NULL COMMENT '评论内容',
-  `parent_id` bigint DEFAULT '0' COMMENT '父评论ID(0为顶级)',
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
-  `is_deleted` tinyint(1) DEFAULT '0' COMMENT '0为未删除，1为已删除',
-  `comment_id` bigint DEFAULT NULL COMMENT '评论id',
-  `username` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
-  `avatar` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3979 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='评论表';
+- 缓存热点数据，例如视频列表、热门推荐
+- 作为异步链路中的中间状态存储，例如播放量计数、点赞集合、关注集合
 
-# 模拟存在的手机号表
-CREATE TABLE `exist_phone` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `username` varchar(50) NOT NULL COMMENT '电话号主姓名',
-  `phone` varchar(11) NOT NULL COMMENT '电话号码',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_phone` (`phone`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+同时使用 `Redisson` 提供：
 
-CREATE TABLE `follow` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `follow_user_id` bigint NOT NULL COMMENT '关注者ID',
-  `fan_user_id` bigint NOT NULL COMMENT '被关注者（粉丝）',
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_follow_fan` (`follow_user_id`,`fan_user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='关注表';
+- 分布式锁
+- 延时任务排序集合
+- 原子计数器
 
-CREATE TABLE `type` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `name` varchar(30) NOT NULL COMMENT '分区名',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='视频分区';
+### 2. 为什么使用 RabbitMQ
 
-CREATE TABLE `user` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '用户id',
-  `username` varchar(50) NOT NULL COMMENT '用户名',
-  `phone` varchar(11) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '用户账号/手机号',
-  `password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '密码(加密)',
-  `nickname` varchar(50) DEFAULT NULL COMMENT '昵称',
-  `avatar` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT '/static/images/202304061680747832129368.jpg' COMMENT '头像(图片路径)',
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `user_id` bigint DEFAULT NULL,
-  `follow_count` bigint DEFAULT '0' COMMENT '关注数量',
-  `fans_count` bigint DEFAULT '0' COMMENT '粉丝数量',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_username` (`username`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户表';
+RabbitMQ 用于把高频写操作异步化，主要覆盖：
 
-CREATE TABLE `user_info` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `user_id` bigint NOT NULL,
-  `gender` tinyint DEFAULT '0' COMMENT '0-未知 1-男 2-女',
-  `birthday` date DEFAULT NULL,
-  `sign` varchar(100) DEFAULT NULL COMMENT '签名',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_user_id` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户信息扩展';
+- 视频播放
+- 视频点赞
+- 视频收藏
+- 视频评论
+- 用户关注 / 取关
+- 视频删除
 
-CREATE TABLE `video` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '视频ID',
-  `user_id` bigint NOT NULL COMMENT '发布用户ID',
-  `title` varchar(100) DEFAULT NULL COMMENT '标题',
-  `intro` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT '这个作者很懒，没有任何描述' COMMENT '简介',
-  `url` varchar(255) NOT NULL COMMENT '视频地址',
-  `cover` varchar(255) DEFAULT NULL COMMENT '封面',
-  `type_id` bigint NOT NULL COMMENT '分区ID',
-  `play_count` int DEFAULT '0' COMMENT '播放量',
-  `like_count` int DEFAULT '0' COMMENT '点赞数',
-  `collection_count` int DEFAULT '0' COMMENT '收藏数',
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  `is_delete` tinyint DEFAULT '0' COMMENT '1表示已删除，0表示未删除',
-  `author_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '懒得起名的作者' COMMENT '作者名字',
-  `comment_count` int DEFAULT '0' COMMENT '评论数量',
-  `author_avatar` varchar(255) DEFAULT '/static/images/202304061680747832129368.jpg',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='视频表';
+这样可以把请求线程与数据库写入解耦，降低峰值流量对核心库的冲击。
 
-CREATE TABLE `video_collection` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `video_id` varchar(255) NOT NULL,
-  `user_id` bigint NOT NULL,
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_video_user` (`video_id`,`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='视频收藏';
+### 3. 为什么使用 Elasticsearch
 
-CREATE TABLE `video_like` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `video_id` varchar(255) NOT NULL,
-  `user_id` bigint NOT NULL,
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_video_user` (`video_id`,`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='视频点赞';
+视频搜索场景更适合 ES，而不是 MySQL `like` 查询。  
+ES 主要用于：
+
+- 关键词搜索
+- 搜索建议
+- 推荐/热榜相关能力的检索支撑
+
+### 4. 播放量链路设计
+
+播放量统计链路大致如下：
+
+1. 播放请求进入 MQ
+2. consumer 将播放增量写入 Redis 原子计数器
+3. 延时任务定时聚合增量
+4. 批量写入 MySQL 并同步 ES
+
+这样避免了“每次播放都直接写库”的写放大问题。
+
+## 已完成优化与重构
+
+### 性能与稳定性优化
+
+- **修复视频列表缓存锁逻辑**  
+  避免获取到锁后反而走降级逻辑，减少并发回源数据库压力
+
+- **Redis `KEYS` 改 `SCAN`**  
+  避免在大 keyspace 下触发阻塞扫描
+
+- **播放统计改为批量落库**  
+  从“每次播放都写 MySQL / ES”改为“Redis 计数 + 定时批量同步”
+
+- **前端搜索建议增加防抖与请求取消**  
+  减少无效请求和输入抖动
+
+- **热点日志降噪**  
+  降低高频链路日志级别，避免日志放大和敏感 token 明文输出
+
+### 后端结构重构
+
+- **统一鉴权边界**
+  - 收口公开路径配置到 `AuthPathConstants`
+  - 明确当前登录校验由 `LoginInterceptor` 负责
+  - 删除空壳 `JwtTokenFilter`
+
+- **拆分延时任务职责**
+  - 从单个大类拆成：
+    - `LikeDelayTask`
+    - `PlayDelayTask`
+    - `DeleteDelayTask`
+    - `FollowDelayTask`
+
+- **拆分任务 support**
+  - 将处理逻辑进一步拆成：
+    - `LikeTaskSupport`
+    - `PlayTaskSupport`
+    - `DeleteTaskSupport`
+    - `FollowTaskSupport`
+
+- **拆分视频服务职责**
+  - 把 `VideoServiceImpl` 中的消息发布抽到 `VideoEventPublisher`
+  - 把查询、缓存、热门推荐逻辑抽到 `VideoQuerySupport`
+
+- **强类型化异步消息体**
+  - 用 `FollowCommand`、`VideoDeleteCommand` 替代部分 `Map<String, Object>`
+
+- **抽取 consumer 公共重试模板**
+  - 通过 `ConsumerRetrySupport` 统一：
+    - 重试次数读取
+    - `basicNack`
+    - `basicReject`
+    - 死信 ack
+
+- **统一 service 返回风格**
+  - 引入 `ServiceResult`
+  - 减少 controller 中的字符串判断逻辑
+
+### 业务正确性精修
+
+- 修复点赞链路中缓存 key 使用前后不一致的问题
+- 修复点赞延时任务时间戳写死的问题
+- 修复收藏链路中判断对象错误和计数重复递增的问题
+- 修复视频分发 consumer 中重复确认/重复重试风险
+- 修复 `InfoController` 中 `Map` 参数强转 `Long` 可能导致的类型异常
+
+## 项目结构
+
+```text
+yuliyuli_enterprise/
+├─ .github/workflows/              # GitHub Actions 工作流
+├─ src/main/java/com/yuliyuli/
+│  ├─ annotation/                  # 自定义注解
+│  ├─ aspect/                      # AOP 切面（日志、限流）
+│  ├─ common/                      # 通用返回体、上下文、结果模型
+│  ├─ config/                      # 安全、MQ、Redis、Web 配置
+│  ├─ consumer/                    # MQ 消费者
+│  │  └─ support/                  # consumer 公共重试模板
+│  ├─ controller/                  # 接口层
+│  ├─ dto/                         # DTO / VO / command
+│  ├─ entity/                      # 实体对象
+│  ├─ exception/                   # 全局异常处理
+│  ├─ init/                        # 启动初始化逻辑
+│  ├─ mapper/                      # MyBatis 数据访问层
+│  ├─ repository/                  # Elasticsearch 仓库
+│  ├─ service/                     # 业务层
+│  │  └─ support/                  # service 支撑类
+│  ├─ task/                        # 延时任务与任务 support
+│  └─ util/                        # 工具类
+├─ src/main/resources/
+│  └─ application.yml
+├─ yuliyuli-frontend/              # 前端项目
+├─ Dockerfile
+├─ docker-compose.yml
+└─ README.md
 ```
-</details>
 
-2. 修改配置
+## 本地运行
+
+### 1. 环境要求
+
+- `JDK 17+`
+- `Maven 3.9+`
+- `Node.js 18+`
+- `MySQL 8.0+`
+- `Redis 7+`
+- `RabbitMQ 3.12+`
+- `Elasticsearch 8.11+`
+
+### 2. 初始化数据库
+
+- 新建数据库：`yuliyuli_enterprise`
+- 导入初始化 SQL
+
+如果后续继续维护，建议将 SQL 独立沉淀到：
+
+- `docs/sql/init.sql`
+
+### 3. 修改配置
+
 编辑 `src/main/resources/application.yml`：
+
 ```yaml
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/yuliyuli_enterprise?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
     username: root
     password: your_password
-  redis:
-    host: localhost
-    port: 6379
-  elasticsearch:
-    uris: http://localhost:9200
+  data:
+    redis:
+      host: localhost
+      port: 6379
   rabbitmq:
     host: localhost
     port: 5672
     username: guest
     password: guest
+  elasticsearch:
+    uris: http://localhost:9200
 ```
 
-3. 运行项目
+### 4. 启动后端
+
 ```bash
 ./mvnw spring-boot:run
 ```
 
-### 前端启动
+或：
+
+```bash
+mvn spring-boot:run
+```
+
+### 5. 启动前端
 
 ```bash
 cd yuliyuli-frontend
@@ -275,30 +303,86 @@ npm install
 npm run dev
 ```
 
-## 项目亮点
+### 6. 默认访问地址
 
-1. **架构设计**：前后端分离，分层清晰，职责明确
-2. **性能优化**：
-   - Redis缓存（视频列表、热门视频）
-   - Spring Cache注解式缓存
-   - 布隆过滤器防止缓存穿透
-   - 消息队列异步处理
-3. **数据安全**：
-   - JWT认证
-   - 接口限流
-   - 敏感数据脱敏
-   - 事务管理保证数据一致性
-4. **可观测性**：
-   - 操作日志记录（AOP实现）
-   - 全局异常处理
-   - 详细的日志输出
-5. **可扩展性**：模块化设计，易于扩展新功能
+- 前端：`http://localhost:5173`
+- 后端：`http://localhost:8081`
+- 健康检查：`http://localhost:8081/actuator/health`
+
+## Docker 部署
+
+项目提供：
+
+- `Dockerfile`
+- `yuliyuli-frontend/Dockerfile`
+- `docker-compose.yml`
+
+可通过以下方式本地启动整套服务：
+
+```bash
+docker compose up -d --build
+```
+
+默认会启动：
+
+- MySQL
+- Redis
+- RabbitMQ
+- Elasticsearch
+- Backend
+- Frontend
+
+## CI/CD
+
+项目提供 GitHub Actions 工作流：
+
+- 后端测试
+- 前端构建
+- Docker Compose 构建
+- 条件化部署
+- 流程通知
+
+并已针对以下问题做过修复与增强：
+
+- 部署分支不再写死 `master`
+- Redis 健康检查兼容有无密码场景
+- 后端健康检查接入 Actuator
+- workflow 支持按目录变更范围触发前后端 job
+- 部署前增加服务器 `docker` / `docker compose` 预检查
+
+## 面试可重点讲的内容
+
+如果作为实习项目，比较推荐重点讲这几块：
+
+- **缓存击穿防护**：视频列表先查缓存，再用分布式锁控制回源
+- **播放量异步统计链路**：MQ + Redis 计数器 + 延时任务 + 批量落库
+- **异步任务重构**：将大而全的任务处理类拆成多个独立任务与 support
+- **工程可维护性优化**：DTO 替代 `Map`、抽公共重试模板、统一 service 返回模型
+- **搜索能力建设**：使用 ES 支撑视频搜索与搜索建议
+- **CI/CD 和部署**：项目不仅能开发运行，也具备基本构建部署能力
+
+## 项目不足
+
+目前项目仍然有一些可以继续改进的地方：
+
+- 部分接口仍然使用 `Map` 作为返回结构，后续可继续 DTO 化
+- 自动化测试覆盖不足
+- 还没有系统性压测数据
+- 监控、告警、灰度发布等能力尚未补齐
+- 前端部分页面仍可继续抽离公共逻辑
+
+## 后续计划
+
+- 继续统一 controller / DTO 返回风格
+- 补充核心链路测试
+- 完善接口文档与部署文档
+- 增强前端模块复用能力
+- 在条件允许的情况下补压测与监控方案
+
+## 相关文档
+
+- `docs/INTERVIEW_QA.md`：项目面试问答
 
 ## 作者
 
-Dima
-
-## 项目介绍
-
-夯实技术，现在前端还未完全掌握，后续添加生产环境、开发环境、测试环境等，并完成部署。
-有一丁丁功能尚未完成（收藏和分享的数量更新），急着去完成分布式了。
+`Dima`

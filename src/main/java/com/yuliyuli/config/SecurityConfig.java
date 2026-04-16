@@ -1,9 +1,6 @@
 package com.yuliyuli.config;
 
-import com.alibaba.fastjson2.JSON;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -42,66 +39,17 @@ public class SecurityConfig {
                 authorize
                     .requestMatchers(CorsUtils::isPreFlightRequest)
                     .permitAll()
-                    // 白名单接口
-                        .requestMatchers(
-                                "/api/user/login",
-                                "/api/user/register",
-                                "/api/user/getCode",
-                                "/api/video/videoList",
-                                "/api/video/videoTypeList",
-                                "/api/video/clickVideo/**",
-                                "/api/info/authorPage/**",
-                                "/api/search/video",
-                                "/api/search/topTenVideo"
-                        ).permitAll()
-                        // 以下接口必须登录才能访问
-                        .requestMatchers(
-                          "/api/video/delivery",
-                                "/api/video/like",
-                                "/api/video/comment",
-                                "/api/video/collect",
-                                "/api/user/modifyInfo",
-                                "/api/user/modifyAvatar",
-                                "/api/info/follow",
-                                "/api/info/videoDelete/**"
-                        ).authenticated()
-                        // 其他所有接口都需要认证
-                        .anyRequest().authenticated())
-        .exceptionHandling(
-            ex ->
-                ex.authenticationEntryPoint(
-                        (request, response, authException) -> {
-                          // 未登录/Token失效时，返回统一的401结果
-                          response.setContentType("application/json;charset=UTF-8");
-                          response
-                              .getWriter()
-                              .write("{\"code\":401,\"msg\":\"无权限访问\",\"data\":null}");
-                        })
-                    .accessDeniedHandler(
-                        (request, response, accessDeniedException) -> {
-                          Map<String, Object> map = new HashMap<>();
-                          map.put("code", 403);
-                          map.put("msg", "未登录或Token已过期");
-                          map.put("data", null);
-                          // 无权限时，返回统一的403结果
-                          response.setContentType("application/json;charset=UTF-8");
-                          response.getWriter().write(JSON.toJSONString(map));
-                        }))
+                    .requestMatchers(AuthPathConstants.PUBLIC_PATHS)
+                    .permitAll()
+                    // 当前项目的登录态校验由 LoginInterceptor 负责，Security 仅保留基础安全能力。
+                    .anyRequest()
+                    .permitAll())
         // ========== 退出登录 ==========
         .logout(
             logout ->
                 logout
                     .logoutUrl("/api/user/logout") // 退出登录接口
-                    .logoutSuccessHandler(
-                        (request, response, authentication) -> {
-                          Map<String, Object> map = new HashMap<>();
-                          map.put("code", 200);
-                          map.put("msg", "退出登录成功");
-                          map.put("data", null);
-                          // 退出成功返回JSON
-                          response.setContentType("application/json;charset=UTF-8");
-                          response.getWriter().write(JSON.toJSONString(map));
-                        }));
+                    .logoutSuccessHandler((request, response, authentication) -> {}));
     return httpSecurity.build();
   }
 
