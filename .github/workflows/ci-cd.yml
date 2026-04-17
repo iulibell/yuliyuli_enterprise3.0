@@ -113,17 +113,31 @@ jobs:
     name: Deploy with Docker Compose
     runs-on: ubuntu-latest
     needs: build
+    outputs:
+      deploy_enabled: ${{ steps.check-server-config.outputs.deploy_enabled }}
     # 只在master/main分支且有服务器配置时执行部署
     if: |
       needs.build.result == 'success' &&
-      (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') &&
-      secrets.SERVER_HOST != ''
+      (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
     environment: production
     steps:
+      - name: Check deploy secrets
+        id: check-server-config
+        run: |
+          if [ -n "${{ secrets.SERVER_HOST }}" ] && [ -n "${{ secrets.SERVER_USER }}" ] && [ -n "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "deploy_enabled=true" >> "$GITHUB_OUTPUT"
+            echo "服务器配置完整，继续部署。"
+          else
+            echo "deploy_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "服务器配置不完整，跳过部署。"
+          fi
+
       - name: Checkout code
+        if: steps.check-server-config.outputs.deploy_enabled == 'true'
         uses: actions/checkout@v4
 
       - name: Deploy to server
+        if: steps.check-server-config.outputs.deploy_enabled == 'true'
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -223,7 +237,7 @@ jobs:
 
       - name: Send skipped notification
         if: |
-          needs.deploy.result == 'skipped' &&
+          needs.deploy.outputs.deploy_enabled == 'false' &&
           needs.build.result != 'failure' &&
           needs.test-backend.result != 'failure' &&
           needs.test-frontend.result != 'failure'
