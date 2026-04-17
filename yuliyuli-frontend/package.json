@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "typecheck": "vue-tsc --noEmit",
     "build": "vite build",
     "preview": "vite preview",
     "format": "prettier --write \"src/**/*.{vue,ts,tsx,js,jsx,json,css,scss,md}\"",
