@@ -1,0 +1,58 @@
+package com.yuliyuli.service.impl;
+
+import com.yuliyuli.dto.query.VideoWrapper;
+import com.yuliyuli.dto.vo.SearchVideoVO;
+import com.yuliyuli.entity.document.VideoDocument;
+import com.yuliyuli.exception.GlobalExceptionHandler;
+import com.yuliyuli.init.SearchVideoInit;
+import com.yuliyuli.mapper.VideoMapper;
+import com.yuliyuli.repository.VideoRepository;
+import com.yuliyuli.service.SearchService;
+import com.yuliyuli.util.VideoConvertUtil;
+
+import jakarta.annotation.Resource;
+import java.util.List;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+
+@Service
+@Slf4j
+public class SearchServiceImpl implements SearchService {
+
+  @Resource private VideoRepository videoRepository;
+
+  @Resource private RedisTemplate<String, VideoDocument> redisTemplate;
+
+  @Cacheable(value = "topTenVideo", unless = "#result == null")
+  public List<SearchVideoVO> getTopTenVideo() {
+    try {
+      List<VideoDocument> topTenVideo =
+          redisTemplate.opsForList().range(SearchVideoInit.HOT_TOP_KEY, 0, 9);
+        return VideoConvertUtil.convertVideoDocumentListToSearchVideoVOList(topTenVideo);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
+    } catch (Exception e) {
+      log.error("获取热门视频失败", e);
+      throw new GlobalExceptionHandler.BusinessException("获取热门视频失败");
+    }
+  }
+
+  @Override
+  @Cacheable(value = "videoSuggest", key = "#title", unless = "#result == null")
+  public List<SearchVideoVO> findByTitleSuggest(String title) {
+    List<VideoDocument> videoDocuments = null;
+    try {
+      videoDocuments =
+          videoRepository.findByTitleSuggest(title, PageRequest.of(0, 10)).getContent();
+        return VideoConvertUtil.convertVideoDocumentListToSearchVideoVOList(videoDocuments);
+    } catch (GlobalExceptionHandler.BusinessException e) {
+      throw e;
+    } catch (Exception e) {
+      log.error("根据标题建议查询视频失败", e);
+      throw new GlobalExceptionHandler.BusinessException("根据标题建议查询视频失败");
+    }
+  }
+}

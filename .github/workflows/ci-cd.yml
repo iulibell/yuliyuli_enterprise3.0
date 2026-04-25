@@ -1,0 +1,258 @@
+name: CI/CD Pipeline with Docker Compose
+
+on:
+  push:
+    branches: [master, main, develop]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      workflow: ${{ steps.filter.outputs.workflow }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'src/**'
+              - 'pom.xml'
+              - 'Dockerfile'
+            frontend:
+              - 'frontend/**'
+            workflow:
+              - '.github/workflows/**'
+              - 'docker-compose.yml'
+              - '.env.example'
+
+  # ==================== 测试阶段 ====================
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.workflow == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Run Maven tests
+        run: mvn clean test -B
+
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.workflow == 'true'
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check frontend
+        run: npm run typecheck
+
+      - name: Build frontend
+        run: npm run build
+
+  # ==================== 构建阶段 ====================
+  build:
+    name: Build with Docker Compose
+    runs-on: ubuntu-latest
+    needs: [changes, test-backend, test-frontend]
+    if: |
+      always() &&
+      github.event_name != 'pull_request' &&
+      needs.test-backend.result != 'failure' &&
+      needs.test-frontend.result != 'failure' &&
+      (
+        needs.changes.outputs.backend == 'true' ||
+        needs.changes.outputs.frontend == 'true' ||
+        needs.changes.outputs.workflow == 'true'
+      )
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build images
+        run: |
+          docker compose -f docker-compose.yml build
+
+  # ==================== 部署阶段 ====================
+  deploy:
+    name: Deploy with Docker Compose
+    runs-on: ubuntu-latest
+    needs: build
+    outputs:
+      deploy_enabled: ${{ steps.check-server-config.outputs.deploy_enabled }}
+    # 只在master/main分支且有服务器配置时执行部署
+    if: |
+      needs.build.result == 'success' &&
+      (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    environment: production
+    steps:
+      - name: Check deploy secrets
+        id: check-server-config
+        run: |
+          if [ -n "${{ secrets.SERVER_HOST }}" ] && [ -n "${{ secrets.SERVER_USER }}" ] && [ -n "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "deploy_enabled=true" >> "$GITHUB_OUTPUT"
+            echo "服务器配置完整，继续部署。"
+          else
+            echo "deploy_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "服务器配置不完整，跳过部署。"
+          fi
+
+      - name: Checkout code
+        if: steps.check-server-config.outputs.deploy_enabled == 'true'
+        uses: actions/checkout@v4
+
+      - name: Deploy to server
+        if: steps.check-server-config.outputs.deploy_enabled == 'true'
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            # 设置变量
+            PROJECT_DIR="/opt/yuliyuli"
+            COMPOSE_FILE="docker-compose.yml"
+            ENV_FILE=".env"
+
+            # 预检查运行环境
+            if ! command -v docker >/dev/null 2>&1; then
+              echo "未安装 docker"
+              exit 1
+            fi
+
+            if ! docker compose version >/dev/null 2>&1; then
+              echo "未安装 docker compose"
+              exit 1
+            fi
+
+            # 创建项目目录
+            mkdir -p $PROJECT_DIR
+            cd $PROJECT_DIR
+
+            # 备份当前环境变量
+            if [ -f $ENV_FILE ]; then
+              cp $ENV_FILE ${ENV_FILE}.backup.$(date +%Y%m%d_%H%M%S)
+            fi
+
+            # 拉取最新代码
+            if [ -d ".git" ]; then
+              git fetch origin
+              git checkout "${{ github.ref_name }}"
+              git reset --hard "origin/${{ github.ref_name }}"
+            else
+              git clone --branch "${{ github.ref_name }}" ${{ github.server_url }}/${{ github.repository }}.git .
+            fi
+
+            # 恢复环境变量
+            if [ -f ${ENV_FILE}.backup.* ]; then
+              LATEST_BACKUP=$(ls -t ${ENV_FILE}.backup.* | head -1)
+              cp $LATEST_BACKUP $ENV_FILE
+            fi
+
+            # 如果环境变量文件不存在，从示例创建
+            if [ ! -f $ENV_FILE ]; then
+              cp .env.example $ENV_FILE
+              echo "警告：请编辑 $ENV_FILE 文件配置正确的环境变量"
+            fi
+
+            # 使用 Docker Compose 构建和启动服务
+            echo "构建和启动服务..."
+            docker compose -f $COMPOSE_FILE down --remove-orphans || true
+            docker compose -f $COMPOSE_FILE up -d --build
+
+            # 等待服务启动
+            sleep 30
+
+            # 健康检查
+            echo "检查服务健康状态..."
+            if curl -f http://localhost:8081/actuator/health > /dev/null 2>&1; then
+              echo "后端服务运行正常"
+            else
+              echo "后端服务健康检查失败"
+              exit 1
+            fi
+
+            if curl -f http://localhost/ > /dev/null 2>&1; then
+              echo "前端服务运行正常"
+            else
+              echo "前端服务健康检查失败"
+              exit 1
+            fi
+
+            echo "部署完成！"
+
+  # ==================== 通知阶段 ====================
+  notify:
+    name: Send Notification
+    runs-on: ubuntu-latest
+    needs: [changes, test-backend, test-frontend, build, deploy]
+    if: always()
+    steps:
+      - name: Send success notification
+        if: |
+          needs.test-backend.result != 'failure' &&
+          needs.test-frontend.result != 'failure' &&
+          needs.build.result != 'failure' &&
+          needs.deploy.result == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log('部署成功！')
+
+      - name: Send skipped notification
+        if: |
+          needs.deploy.outputs.deploy_enabled == 'false' &&
+          needs.build.result != 'failure' &&
+          needs.test-backend.result != 'failure' &&
+          needs.test-frontend.result != 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log('部署已跳过（未配置服务器信息）')
+
+      - name: Send failure notification
+        if: |
+          needs.test-backend.result == 'failure' ||
+          needs.test-frontend.result == 'failure' ||
+          needs.build.result == 'failure' ||
+          needs.deploy.result == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log('CI/CD 流程失败，请检查测试、构建或部署日志。')

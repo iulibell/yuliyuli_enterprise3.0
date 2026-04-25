@@ -1,0 +1,62 @@
+package com.yuliyuli.init;
+
+import com.yuliyuli.dto.query.FollowWrapper;
+import com.yuliyuli.dto.query.UserWrapper;
+import com.yuliyuli.entity.user.User;
+import com.yuliyuli.mapper.FollowMapper;
+import com.yuliyuli.mapper.UserMapper;
+
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
+import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RedissonClient;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
+
+@Component
+@Slf4j
+public class HotUserInit {
+
+  private final String HOT_USER_KEY_PREFIX = "user:hot:";
+  private final int EXPIRE_TIME = 11;
+
+  @Resource private RedissonClient redissonClient;
+
+  @Resource private UserWrapper userWrapper;
+
+  @Resource private UserMapper userMapper;
+
+  @Resource private FollowWrapper followWrapper;
+
+  @Resource private FollowMapper followMapper;
+
+  @PostConstruct
+  public void init() {
+    log.info("初始化热门用户");
+    asynInitHotUser();
+  }
+
+  @Async("asyncThreadPoolExecutor")
+  /* 初始化热门用户 */
+  protected CompletableFuture<Void> asynInitHotUser() {
+    log.info("进行异步初始化热门用户");
+    List<Long> hotUserIds =
+        userMapper.selectList(userWrapper.buildHotUserList()).stream()
+            .map(User::getUserId)
+            .toList();
+    return CompletableFuture.runAsync(
+        () ->
+            followMapper
+                .selectList(followWrapper.buildFollowListByUserId(hotUserIds.get(0)))
+                .forEach(
+                    follow -> {
+                      redissonClient
+                          .getScoredSortedSet(HOT_USER_KEY_PREFIX + follow.getFollowUserId())
+                          .add(follow.getFanUserId(), Duration.ofHours(EXPIRE_TIME));
+                    }));
+  }
+}
