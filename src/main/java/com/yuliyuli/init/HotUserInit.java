@@ -41,13 +41,13 @@ public class HotUserInit {
   }
 
   @Async("asyncThreadPoolExecutor")
-  /** 初始化热门用户 */
-  private CompletableFuture<Void> asynInitHotUser() {
+  /* 初始化热门用户 */
+  protected CompletableFuture<Void> asynInitHotUser() {
     log.info("进行异步初始化热门用户");
     List<Long> hotUserIds =
         userMapper.selectList(userWrapper.buildHotUserList()).stream()
             .map(User::getUserId)
-            .collect(Collectors.toList());
+            .toList();
     return CompletableFuture.runAsync(
         () ->
             followMapper

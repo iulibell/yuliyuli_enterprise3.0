@@ -10,9 +10,6 @@ import java.lang.annotation.Target;
  *
  * @author yuliyuli
  * @date 2024-03-20
- * @param limit 限制次数
- * @param window 时间窗口(秒)
- * @param key 限流键
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)

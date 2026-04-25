@@ -10,7 +10,6 @@ public class CommentWrapper {
   /**
    * 获取视频的评论列表
    *
-   * @param videoId 视频url
    * @return LambdaQueryWrapper<Comment>获取视频的评论列表
    */
   public LambdaQueryWrapper<Comment> getCommentList(String videoUrl) {

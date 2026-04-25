@@ -49,7 +49,7 @@ public class VideoDeliverConsumer {
   public void videoDeliveryConsumer(
       VideoDeliveryWithoutFile videoDelivery, Channel channel, Message mqMessage) throws Exception {
     log.info("视频分发消息:{}", videoDelivery);
-    Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
+    long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     // 从消息头中获取重试次数,如果没有则默认0
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
     int retryCount = consumerRetrySupport.getRetryCount(mqMessage, RETRY_HEADER);
@@ -106,7 +106,7 @@ public class VideoDeliverConsumer {
       consumerRetrySupport.handleRetry(
           deliveryTag, channel, retryCount, MAX_RETRY_COUNT, headers, RETRY_HEADER, "视频分发");
     } finally {
-      if (lock.isHeldByCurrentThread() && lock != null) {
+      if (lock.isHeldByCurrentThread()) {
         lock.unlock();
       }
     }
@@ -121,9 +121,9 @@ public class VideoDeliverConsumer {
   public void videoDeadConsumer(
       VideoDeliveryWithoutFile videoDelivery, Channel channel, Message mqMessage) {
     log.info("分发视频死信消费者,视频URL:{}", videoDelivery.getUrl());
-    Long diliverTag = mqMessage.getMessageProperties().getDeliveryTag();
+    long deliverTag = mqMessage.getMessageProperties().getDeliveryTag();
     try {
-      consumerRetrySupport.ackDeadLetter(diliverTag, channel, "视频分发");
+      consumerRetrySupport.ackDeadLetter(deliverTag, channel, "视频分发");
     } catch (Exception e) {
       log.error("死信队列丢弃分发视频失败,视频URL:{}", videoDelivery.getUrl(), e);
       throw new GlobalExceptionHandler.BusinessException("死信队列丢弃分发视频失败");

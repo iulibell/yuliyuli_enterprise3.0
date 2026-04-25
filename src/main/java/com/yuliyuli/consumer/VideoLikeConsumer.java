@@ -81,9 +81,9 @@ public class VideoLikeConsumer {
   @RabbitListener(queues = RabbitMqConfig.LIKE_DEAD_QUEUE_NAME)
   public void videoLikeDeadConsumer(VideoLike videoLike, Channel channel, Message mqMessage) {
     log.info("点赞视频死信消费者,视频ID:{}", videoLike.getVideoId());
-    Long diliverTag = mqMessage.getMessageProperties().getDeliveryTag();
+    long deliverTag = mqMessage.getMessageProperties().getDeliveryTag();
     try {
-      consumerRetrySupport.ackDeadLetter(diliverTag, channel, "点赞");
+      consumerRetrySupport.ackDeadLetter(deliverTag, channel, "点赞");
     } catch (Exception e) {
       log.error("死信队列点赞视频失败,视频ID:{}", videoLike.getVideoId(), e);
       throw new GlobalExceptionHandler.BusinessException("死信队列点赞视频失败");

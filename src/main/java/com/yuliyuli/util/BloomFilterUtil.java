@@ -37,6 +37,6 @@ public class BloomFilterUtil {
    */
   @SuppressWarnings("null")
   public boolean checkVideoExists(String videoUrl) {
-    return videoFilter.mightContain(videoUrl);
+    return !videoFilter.mightContain(videoUrl);
   }
 }

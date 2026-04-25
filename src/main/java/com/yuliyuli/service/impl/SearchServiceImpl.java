@@ -24,10 +24,6 @@ public class SearchServiceImpl implements SearchService {
 
   @Resource private VideoRepository videoRepository;
 
-  @Resource private VideoMapper videoMapper;
-
-  @Resource private VideoWrapper videoWrapper;
-
   @Resource private RedisTemplate<String, VideoDocument> redisTemplate;
 
   @Cacheable(value = "topTenVideo", unless = "#result == null")
@@ -35,9 +31,7 @@ public class SearchServiceImpl implements SearchService {
     try {
       List<VideoDocument> topTenVideo =
           redisTemplate.opsForList().range(SearchVideoInit.HOT_TOP_KEY, 0, 9);
-      List<SearchVideoVO> topTenVOList =
-          VideoConvertUtil.convertVideoDocumentListToSearchVideoVOList(topTenVideo);
-      return topTenVOList;
+        return VideoConvertUtil.convertVideoDocumentListToSearchVideoVOList(topTenVideo);
     } catch (GlobalExceptionHandler.BusinessException e) {
       throw e;
     } catch (Exception e) {
@@ -53,9 +47,7 @@ public class SearchServiceImpl implements SearchService {
     try {
       videoDocuments =
           videoRepository.findByTitleSuggest(title, PageRequest.of(0, 10)).getContent();
-      List<SearchVideoVO> videoVOList =
-          VideoConvertUtil.convertVideoDocumentListToSearchVideoVOList(videoDocuments);
-      return videoVOList;
+        return VideoConvertUtil.convertVideoDocumentListToSearchVideoVOList(videoDocuments);
     } catch (GlobalExceptionHandler.BusinessException e) {
       throw e;
     } catch (Exception e) {

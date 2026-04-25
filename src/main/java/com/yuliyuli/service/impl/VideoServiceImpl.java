@@ -16,6 +16,7 @@ import com.yuliyuli.service.SearchService;
 import com.yuliyuli.service.VideoService;
 import com.yuliyuli.service.support.VideoEventPublisher;
 import com.yuliyuli.service.support.VideoQuerySupport;
+import com.yuliyuli.task.CommentTaskSupport;
 import com.yuliyuli.util.BloomFilterUtil;
 import jakarta.annotation.Resource;
 import java.util.List;
@@ -38,6 +39,8 @@ public class VideoServiceImpl implements VideoService {
   @Resource private VideoQuerySupport videoQuerySupport;
 
   @Resource private BloomFilterUtil bloomFilterUtil;
+
+  @Resource private CommentTaskSupport commentTaskSupport;
 
   /*=======================================================👇消息发布者============================================================= */
 
@@ -75,7 +78,7 @@ public class VideoServiceImpl implements VideoService {
       return ServiceResult.fail("请完成登录");
     }
     try {
-      if (!bloomFilterUtil.checkVideoExists(videoLike.getVideoId())) {
+      if (bloomFilterUtil.checkVideoExists(videoLike.getVideoId())) {
         return ServiceResult.fail("视频不存在");
       }
       videoEventPublisher.publishVideoLike(videoLike);
@@ -99,7 +102,7 @@ public class VideoServiceImpl implements VideoService {
     if (user == null) {
       return ServiceResult.fail("请完成登录");
     }
-    if (!bloomFilterUtil.checkVideoExists(videoCollection.getVideoId())) {
+    if (bloomFilterUtil.checkVideoExists(videoCollection.getVideoId())) {
       return ServiceResult.fail("视频不存在");
     }
     threadPoolExecutor.submit(
@@ -124,19 +127,16 @@ public class VideoServiceImpl implements VideoService {
     if (user == null) {
       return ServiceResult.fail("请完成登录");
     }
-    if (!bloomFilterUtil.checkVideoExists(comment.getVideoId())) {
+    if (bloomFilterUtil.checkVideoExists(comment.getVideoId())) {
       return ServiceResult.fail("视频不存在");
     }
-    threadPoolExecutor.submit(
-        () -> {
-          log.info("进入视频评论线程池");
-          try {
-            videoEventPublisher.publishVideoComment(comment);
-          } catch (Exception e) {
-            log.error("视频评论失败", e);
-          }
-        });
-    return ServiceResult.success("评论请求已提交");
+    try {
+      commentTaskSupport.processComment(comment);
+      return ServiceResult.success("评论成功");
+    } catch (Exception e) {
+      log.error("视频评论失败", e);
+      return ServiceResult.fail("评论失败，请稍后重试");
+    }
   }
 
   /**
@@ -146,7 +146,7 @@ public class VideoServiceImpl implements VideoService {
    */
   @Override
   public ServiceResult hotVideoPlay(String videoUrl) {
-    if (!bloomFilterUtil.checkVideoExists(videoUrl)) {
+    if (bloomFilterUtil.checkVideoExists(videoUrl)) {
       return ServiceResult.fail("视频不存在");
     }
     threadPoolExecutor.submit(
@@ -167,7 +167,7 @@ public class VideoServiceImpl implements VideoService {
    */
   @Override
   public ServiceResult videoPlay(String videoUrl) {
-    if (!bloomFilterUtil.checkVideoExists(videoUrl)) {
+    if (bloomFilterUtil.checkVideoExists(videoUrl)) {
       return ServiceResult.fail("视频不存在");
     }
     threadPoolExecutor.submit(

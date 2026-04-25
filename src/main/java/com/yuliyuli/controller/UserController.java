@@ -20,6 +20,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.validation.annotation.Validated;
@@ -35,6 +37,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/user")
 @Tag(name = "用户模块")
 @Slf4j
+@Validated
 public class UserController {
 
   @Value(
@@ -48,7 +51,6 @@ public class UserController {
   /**
    * 用户登录接口
    *
-   * @param loginUser 登录参数（账号+密码）
    * @return 登录结果（Token+用户信息）
    */
   @OperationLog(value = "用户登录", type = "LOGIN")
@@ -77,7 +79,6 @@ public class UserController {
   /**
    * 校验模块
    *
-   * @param existPhoneDto 校验参数（手机号）
    * @return 校验结果（验证码）
    */
   @RateLimit(key = "getCode", limit = 5, window = 60)
@@ -116,7 +117,10 @@ public class UserController {
   public Result<String> register(
       @Parameter(description = "注册参数（账号+密码）", required = true) @Validated @RequestBody
           RegisterRequest registerDto,
-      @Parameter(description = "校验参数（验证码）", required = true) @RequestParam String code) {
+      @Parameter(description = "校验参数（验证码）", required = true) @RequestParam
+          @NotBlank(message = "验证码不能为空")
+          @Pattern(regexp = "^\\d{6}$", message = "验证码需为6位数字")
+          String code) {
     try {
       ServiceResult result =
           userService.register(registerDto.getPhone(), code, registerDto.getPassword());
@@ -157,7 +161,6 @@ public class UserController {
   /**
    * 修改模块,用户修改头像
    *
-   * @param params 修改参数（头像URL+用户ID）
    * @return 修改结果（用户信息）
    */
   @Operation(summary = "修改模块")

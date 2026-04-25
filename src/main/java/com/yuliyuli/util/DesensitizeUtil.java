@@ -12,24 +12,16 @@ public class DesensitizeUtil {
       return value;
     }
 
-    switch (type) {
-      case PHONE:
-        return phone(value);
-      case EMAIL:
-        return email(value);
-      case ID_CARD:
-        return idCard(value);
-      case NAME:
-        return name(value);
-      case PASSWORD:
-        return password();
-      case BANK_CARD:
-        return bankCard(value);
-      case ADDRESS:
-        return address(value);
-      default:
-        return defaultDesensitize(value);
-    }
+      return switch (type) {
+          case PHONE -> phone(value);
+          case EMAIL -> email(value);
+          case ID_CARD -> idCard(value);
+          case NAME -> name(value);
+          case PASSWORD -> password();
+          case BANK_CARD -> bankCard(value);
+          case ADDRESS -> address(value);
+          default -> defaultDesensitize(value);
+      };
   }
 
   public static String desensitize(String value, int prefixKeep, int suffixKeep) {
@@ -146,7 +138,7 @@ public class DesensitizeUtil {
       return value.charAt(0) + "*";
     }
     if (value.length() <= 4) {
-      return value.substring(0, 1) + "**" + value.substring(value.length() - 1);
+      return value.charAt(0) + "**" + value.substring(value.length() - 1);
     }
     return value.substring(0, 2) + "****" + value.substring(value.length() - 2);
   }

@@ -1,15 +1,18 @@
 package com.yuliyuli.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yuliyuli.annotation.OperationLog;
 import com.yuliyuli.annotation.RateLimit;
 import com.yuliyuli.common.CurrentUserHolder;
 import com.yuliyuli.common.Result;
 import com.yuliyuli.common.ServiceResult;
+import com.yuliyuli.dto.request.CommentLikeRequest;
 import com.yuliyuli.dto.request.CommentRequest;
 import com.yuliyuli.dto.request.VideoCollectionRequest;
 import com.yuliyuli.dto.request.VideoLikeRequest;
 import com.yuliyuli.dto.query.CommentWrapper;
+import com.yuliyuli.dto.vo.CommentLikeResultVO;
 import com.yuliyuli.dto.vo.HotRecommendVideoVO;
 import com.yuliyuli.dto.vo.SearchVideoVO;
 import com.yuliyuli.dto.vo.VideoDetailPageVO;
@@ -20,8 +23,11 @@ import com.yuliyuli.entity.video.Comment;
 import com.yuliyuli.entity.video.VideoCollection;
 import com.yuliyuli.entity.video.VideoLike;
 import com.yuliyuli.exception.GlobalExceptionHandler;
+import com.yuliyuli.mapper.CommentLikeMapper;
 import com.yuliyuli.mapper.CommentMapper;
 import com.yuliyuli.mapper.FollowMapper;
+import com.yuliyuli.mapper.UserMapper;
+import com.yuliyuli.mapper.VideoMapper;
 import com.yuliyuli.service.SearchService;
 import com.yuliyuli.service.VideoService;
 import com.yuliyuli.util.TransferUtil;
@@ -30,7 +36,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -47,7 +55,7 @@ import org.springframework.web.multipart.MultipartFile;
  * 视频模块
  *
  * @author Dima
- * @date 2026-03-02
+ * &#064;date  2026-03-02
  */
 @RestController
 @RequestMapping("/api/video")
@@ -65,9 +73,15 @@ public class VideoController {
 
   @Resource private CommentMapper commentMapper;
 
+  @Resource private CommentLikeMapper commentLikeMapper;
+
   @Resource private CommentWrapper commentWrapper;
 
   @Resource private FollowMapper followMapper;
+
+  @Resource private UserMapper userMapper;
+
+  @Resource private VideoMapper videoMapper;
 
   @Resource private VideoService videoService;
 
@@ -79,13 +93,12 @@ public class VideoController {
 
   // 检查用户是否登录
   private boolean checkLogin() {
-    return CurrentUserHolder.getUser() != null;
+    return CurrentUserHolder.getUser() == null;
   }
 
   /**
    * 视频投递
    *
-   * @param video
    * @return 处理结果
    */
   @OperationLog(value = "视频投递", type = "VIDEO_UPLOAD")
@@ -97,7 +110,7 @@ public class VideoController {
       @RequestParam("video.type") String type,
       @RequestParam(value = "video.cover", required = false) MultipartFile cover,
       @RequestParam(value = "video.intro", required = false) String intro) {
-    if (!checkLogin()) {
+    if (checkLogin()) {
       return Result.fail("请完成登录");
     }
     try {
@@ -138,7 +151,7 @@ public class VideoController {
   public Result<String> likeVideo(
       @Parameter(description = "传递的视频对象", required = true) @Validated @RequestBody
           VideoLikeRequest request) {
-    if(!checkLogin()){
+    if(checkLogin()){
       return Result.fail("请完成登录");
     }
     try {
@@ -159,7 +172,6 @@ public class VideoController {
   /**
    * 视频收藏
    *
-   * @param videoCollect
    * @return 处理结果
    */
   @OperationLog(value = "视频收藏", type = "VIDEO_COLLECT")
@@ -169,7 +181,7 @@ public class VideoController {
   public Result<String> collectVideo(
       @Parameter(description = "传递的视频对象", required = true) @Validated @RequestBody
           VideoCollectionRequest request) {
-    if(!checkLogin()){
+    if(checkLogin()){
       return Result.fail("请完成登录");
     }
     try {
@@ -190,7 +202,6 @@ public class VideoController {
   /**
    * 视频评论
    *
-   * @param comment
    * @return 处理结果
    */
   @RateLimit(limit = 10, window = 60, key = "comment")
@@ -199,7 +210,7 @@ public class VideoController {
   public Result<String> commentVideo(
       @Parameter(description = "传递的评论对象", required = true) @Validated @RequestBody
           CommentRequest request) {
-    if(!checkLogin()){
+    if(checkLogin()){
       return Result.fail("请完成登录");
     }
     try {
@@ -220,6 +231,32 @@ public class VideoController {
     } catch (Exception e) {
       log.error("视频评论失败", e);
       return Result.fail("视频评论失败,请稍后重试");
+    }
+  }
+
+  @RateLimit(limit = 20, window = 60, key = "comment-like")
+  @PostMapping("/comment/like")
+  @Operation(summary = "评论点赞/取消点赞")
+  public Result<CommentLikeResultVO> likeComment(
+      @Parameter(description = "评论点赞请求", required = true) @Validated @RequestBody
+          CommentLikeRequest request) {
+    if (checkLogin()) {
+      return Result.fail("请完成登录");
+    }
+    try {
+      boolean liked;
+      if (commentLikeMapper.getLike(request.getCommentId(), request.getUserId()) == null) {
+        commentLikeMapper.insertLike(request.getCommentId(), request.getUserId());
+        liked = true;
+      } else {
+        commentLikeMapper.deleteLike(request.getCommentId(), request.getUserId());
+        liked = false;
+      }
+      int likeCount = commentLikeMapper.countLikeByCommentId(request.getCommentId());
+      return Result.success(new CommentLikeResultVO(liked, likeCount));
+    } catch (Exception e) {
+      log.error("评论点赞失败, commentId:{}, userId:{}", request.getCommentId(), request.getUserId(), e);
+      return Result.fail("评论点赞失败,请稍后重试");
     }
   }
 
@@ -259,6 +296,30 @@ public class VideoController {
     return Result.success(videoService.getSearchVideoResults(title));
   }
 
+  @GetMapping("/detail")
+  @Operation(summary = "根据视频URL获取视频详情")
+  public Result<VideoVO> getVideoDetailByUrl(
+      @Parameter(description = "视频URL") @RequestParam String videoUrl) {
+    try {
+      if (videoUrl == null || videoUrl.isBlank()) {
+        return Result.fail("视频参数不能为空");
+      }
+      com.yuliyuli.entity.video.Video video =
+          videoMapper.selectOne(
+              new LambdaQueryWrapper<com.yuliyuli.entity.video.Video>()
+                  .eq(com.yuliyuli.entity.video.Video::getUrl, videoUrl)
+                  .eq(com.yuliyuli.entity.video.Video::getIsDelete, (short) 0)
+                  .last("LIMIT 1"));
+      if (video == null) {
+        return Result.fail("视频不存在或已删除");
+      }
+      return Result.success(com.yuliyuli.util.VideoConvertUtil.convertVideoToVideoVO(video));
+    } catch (Exception e) {
+      log.error("获取视频详情失败, videoUrl:{}", videoUrl, e);
+      return Result.fail("获取视频详情失败");
+    }
+  }
+
   /**
    * 固定返回15个从100个热门缓存中获取的视频
    *
@@ -283,6 +344,23 @@ public class VideoController {
       // 先对视频进行播放计数，再返回相关视频
       videoService.videoPlay(videoUrl);
       return clickCommonProcess(videoUrl, followUserId, fanUserId, lastId);
+    }
+  }
+
+  @GetMapping("/comment/list")
+  @Operation(summary = "获取视频评论列表")
+  public Result<List<Comment>> getCommentList(
+      @Parameter(description = "视频URL") @RequestParam String videoUrl,
+      @Parameter(description = "当前登录用户ID") @RequestParam(required = false) Long fanUserId,
+      @Parameter(description = "上一页最后一条评论的id") @RequestParam(required = false) Long lastId) {
+    try {
+      Page<Comment> commentPage = new Page<>(1, 30);
+      commentMapper.selectPage(commentPage, commentWrapper.getCommentListByCursor(videoUrl, lastId, 30));
+      enrichCommentLikeInfo(commentPage.getRecords(), fanUserId);
+      return Result.success(commentPage.getRecords());
+    } catch (Exception e) {
+      log.error("获取评论列表失败, videoUrl:{}", videoUrl, e);
+      return Result.fail("获取评论列表失败");
     }
   }
 
@@ -325,12 +403,76 @@ public class VideoController {
       Page<Comment> commentPage = new Page<>(1, 10);
       commentMapper.selectPage(
           commentPage, commentWrapper.getCommentListByCursor(videoUrl, lastId, 10));
+      enrichCommentLikeInfo(commentPage.getRecords(), fanUserId);
       VideoDetailPageVO response =
           new VideoDetailPageVO(
               hotVideoVOList,
               commentPage.getRecords(),
-              followMapper.getFollow(followUserId, fanUserId) != null);
+              hasFollowRelation(followUserId, fanUserId));
       return Result.success(response);
+  }
+
+  private Long normalizeToUserId(Long idOrUserId) {
+    if (idOrUserId == null) {
+      return null;
+    }
+    User byUserId =
+        userMapper.selectOne(
+            new LambdaQueryWrapper<User>().eq(User::getUserId, idOrUserId).last("LIMIT 1"));
+    if (byUserId != null) {
+      return idOrUserId;
+    }
+    User byPrimaryKey = userMapper.selectById(idOrUserId);
+    if (byPrimaryKey != null && byPrimaryKey.getUserId() != null) {
+      return byPrimaryKey.getUserId();
+    }
+    return idOrUserId;
+  }
+
+  private boolean hasFollowRelation(Long followUserId, Long fanUserId) {
+    if (followUserId == null || fanUserId == null) {
+      return false;
+    }
+    Set<Long> followCandidates = buildIdCandidates(followUserId);
+    Set<Long> fanCandidates = buildIdCandidates(fanUserId);
+    for (Long followCandidate : followCandidates) {
+      for (Long fanCandidate : fanCandidates) {
+        if (followMapper.getFollow(followCandidate, fanCandidate) != null) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private Set<Long> buildIdCandidates(Long rawId) {
+    Set<Long> candidates = new LinkedHashSet<>();
+    if (rawId == null) {
+      return candidates;
+    }
+    candidates.add(rawId);
+    Long normalized = normalizeToUserId(rawId);
+    if (normalized != null) {
+      candidates.add(normalized);
+    }
+    return candidates;
+  }
+
+  private void enrichCommentLikeInfo(List<Comment> comments, Long currentUserId) {
+    if (comments == null || comments.isEmpty()) {
+      return;
+    }
+    for (Comment comment : comments) {
+      if (comment == null || comment.getId() == null) {
+        continue;
+      }
+      int likeCount = commentLikeMapper.countLikeByCommentId(comment.getId());
+      comment.setLikeCount(likeCount);
+      boolean liked =
+          currentUserId != null
+              && commentLikeMapper.getLike(comment.getId(), currentUserId) != null;
+      comment.setLiked(liked);
+    }
   }
 
   private Result<String> toResult(ServiceResult result) {

@@ -44,6 +44,7 @@ public class FollowTaskSupport {
     if (followMapper.getFollow(followUserId, fanUserId) == null) {
       followMapper.insertFollow(followUserId, fanUserId);
       followMapper.updateFansCount(followUserId);
+      followMapper.incrementFollowCount(fanUserId);
 
       if (isHotUser) {
         hotUserSet.add(System.currentTimeMillis(), fanUserId);
@@ -59,6 +60,7 @@ public class FollowTaskSupport {
     if (followMapper.getFollow(followUserId, fanUserId) != null) {
       followMapper.deleteFollow(followUserId, fanUserId);
       followMapper.decrementFansCount(followUserId);
+      followMapper.decrementFollowCount(fanUserId);
 
       if (isHotUser) {
         hotUserSet.remove(fanUserId);

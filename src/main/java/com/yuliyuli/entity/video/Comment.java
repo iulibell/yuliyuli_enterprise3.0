@@ -52,4 +52,12 @@ public class Comment {
   @TableField("comment_id")
   @Parameter(name = "评论id")
   private Long commentId;
+
+  @TableField(exist = false)
+  @Parameter(name = "评论点赞数")
+  private Integer likeCount;
+
+  @TableField(exist = false)
+  @Parameter(name = "当前用户是否已点赞")
+  private Boolean liked;
 }

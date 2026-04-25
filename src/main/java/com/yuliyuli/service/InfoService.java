@@ -54,4 +54,13 @@ public interface InfoService {
    * @param fanUserId 粉丝用户ID
    */
   public ServiceResult userUnfollow(Long followUserId, Long fanUserId);
+
+  /**
+   * 查询是否已关注
+   *
+   * @param followUserId 被关注用户ID
+   * @param fanUserId 当前用户ID
+   * @return true=已关注，false=未关注
+   */
+  public boolean isFollowed(Long followUserId, Long fanUserId);
 }

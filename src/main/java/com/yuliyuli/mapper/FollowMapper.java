@@ -40,6 +40,15 @@ public interface FollowMapper extends BaseMapper<Follow> {
   int updateFansCount(Long followUserId);
 
   /**
+   * 更新粉丝用户的关注数
+   *
+   * @param fanUserId 粉丝用户ID
+   * @return 影响行数
+   */
+  @Update("UPDATE user SET follow_count = follow_count + 1 WHERE user_id = #{fanUserId}")
+  int incrementFollowCount(Long fanUserId);
+
+  /**
    * 取消关注扣除粉丝数
    *
    * @param followUserId
@@ -47,6 +56,16 @@ public interface FollowMapper extends BaseMapper<Follow> {
    */
   @Update("UPDATE user SET fans_count = fans_count - 1 WHERE user_id = #{followUserId}")
   int decrementFansCount(Long followUserId);
+
+  /**
+   * 取消关注扣除关注数
+   *
+   * @param fanUserId 粉丝用户ID
+   * @return 影响行数
+   */
+  @Update(
+      "UPDATE user SET follow_count = CASE WHEN follow_count > 0 THEN follow_count - 1 ELSE 0 END WHERE user_id = #{fanUserId}")
+  int decrementFollowCount(Long fanUserId);
 
   /**
    * 根据关注用户ID和粉丝用户ID删除关注关系

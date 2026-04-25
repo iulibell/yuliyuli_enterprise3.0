@@ -1,6 +1,7 @@
 package com.yuliyuli.exception;
 
 import com.yuliyuli.common.Result;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -14,6 +15,17 @@ public class GlobalExceptionHandler {
   public Result<?> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
     log.error("参数校验异常: {}", e.getMessage());
     return Result.fail(e.getBindingResult().getAllErrors().get(0).getDefaultMessage());
+  }
+
+  /** 处理简单参数校验异常（如@RequestParam上的校验） */
+  @ExceptionHandler(ConstraintViolationException.class)
+  public Result<?> handleConstraintViolationException(ConstraintViolationException e) {
+    log.error("参数校验异常: {}", e.getMessage());
+    String message =
+        e.getConstraintViolations().isEmpty()
+            ? "参数校验失败"
+            : e.getConstraintViolations().iterator().next().getMessage();
+    return Result.fail(message);
   }
 
   /** 处理业务异常 */

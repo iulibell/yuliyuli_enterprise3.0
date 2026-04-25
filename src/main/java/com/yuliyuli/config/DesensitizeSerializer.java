@@ -13,9 +13,9 @@ import java.io.IOException;
 
 public class DesensitizeSerializer extends JsonSerializer<String> implements ContextualSerializer {
 
-  private DesensitizeType type;
-  private int prefixKeep;
-  private int suffixKeep;
+  private final DesensitizeType type;
+  private final int prefixKeep;
+  private final int suffixKeep;
 
   public DesensitizeSerializer() {
     this.type = DesensitizeType.DEFAULT;

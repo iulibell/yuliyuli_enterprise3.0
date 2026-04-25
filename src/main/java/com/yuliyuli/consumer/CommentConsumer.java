@@ -27,7 +27,6 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class CommentConsumer {
 
-  private final String RETRY_HEADER = "comment-retry-count";
   private static final String LOCK_KEY_PREFIX = "comment:lock:";
   private static final int MAX_RETRY_COUNT = 3;
   private static final int LOCK_WAIT = 3; // 3秒
@@ -49,7 +48,7 @@ public class CommentConsumer {
   public void commentConsumer(Comment comment, Channel channel, Message mqMessage)
       throws Exception {
     log.info("进入评论消费者");
-    Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
+    long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     // 参数校验
     if (comment == null || comment.getVideoId() == null || comment.getUserId() == null) {
       channel.basicReject(deliveryTag, false);
@@ -58,7 +57,8 @@ public class CommentConsumer {
     }
     // 重试次数,从消息头中获取重试次数,如果没有则默认0
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
-    int retryCount = consumerRetrySupport.getRetryCount(mqMessage, RETRY_HEADER);
+      String RETRY_HEADER = "comment-retry-count";
+      int retryCount = consumerRetrySupport.getRetryCount(mqMessage, RETRY_HEADER);
     // 锁: 每个用户评论时,加锁,防止并发评论
     String lockKey = LOCK_KEY_PREFIX + comment.getUserId();
     RLock lock = redissonClient.getLock(lockKey);
@@ -109,12 +109,11 @@ public class CommentConsumer {
     }
     try {
       // 定义核心参数（文档ID直接用videoUrl，无需替换特殊字符，ES支持特殊字符作为文档ID）
-      String docId = videoUrl; // 要更新的ES文档ID
-      String scriptSource =
+        String scriptSource =
           "ctx._source.commentCount = (ctx._source.commentCount ?: 0) + 1"; // 原子更新脚本
       // 构建 UpdateQuery（适配所有 Spring Data Elasticsearch 版本的通用写法）
       UpdateQuery updateQuery =
-          UpdateQuery.builder(docId)
+          UpdateQuery.builder(videoUrl)
               .withScript(scriptSource) // 传入内联脚本内容（字符串）
               .withScriptType(ScriptType.INLINE) // 明确指定脚本类型为内联（关键！）
               .withRetryOnConflict(3) // 冲突时重试3次
@@ -132,15 +131,11 @@ public class CommentConsumer {
   /**
    * 死信队列（记录+警告）
    *
-   * @param comment
-   * @param channel
-   * @param mqMessage
-   * @throws Exception
    */
   @RabbitListener(queues = RabbitMqConfig.COMMENT_DEAD_QUEUE_NAME)
   public void commentDeadConsumer(Comment comment, Channel channel, Message mqMessage)
       throws Exception {
-    Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
+    long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     log.info("死信队列收到失败评论,评论ID:{}", comment.getCommentId());
     try {
       consumerRetrySupport.ackDeadLetter(deliveryTag, channel, "评论");

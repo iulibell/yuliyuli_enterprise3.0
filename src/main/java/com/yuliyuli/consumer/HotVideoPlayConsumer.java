@@ -34,7 +34,7 @@ public class HotVideoPlayConsumer {
   @RabbitListener(queues = RabbitMqConfig.HOT_PLAY_QUEUE_NAME)
   public void videoPlay(String videoUrl, Channel channel, Message mqMessage) throws Exception {
 
-    Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
+    long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     // 从消息头中获取重试次数,如果没有则默认0
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
     int retryCount = consumerRetrySupport.getRetryCount(mqMessage, RETRY_HEADER);
@@ -77,9 +77,9 @@ public class HotVideoPlayConsumer {
   @RabbitListener(queues = RabbitMqConfig.HOT_PLAY_DEAD_QUEUE_NAME)
   public void videoPlayDeadConsumer(String videoUrl, Channel channel, Message mqMessage) {
     log.info("播放死信消费者,视频URL:{}", videoUrl);
-    Long diliverTag = mqMessage.getMessageProperties().getDeliveryTag();
+    long deliverTag = mqMessage.getMessageProperties().getDeliveryTag();
     try {
-      consumerRetrySupport.ackDeadLetter(diliverTag, channel, "热门播放");
+      consumerRetrySupport.ackDeadLetter(deliverTag, channel, "热门播放");
     } catch (Exception e) {
       log.error("死信队列丢弃热门播放失败,视频URL:{}", videoUrl, e);
       throw new GlobalExceptionHandler.BusinessException("死信队列丢弃热门播放失败");

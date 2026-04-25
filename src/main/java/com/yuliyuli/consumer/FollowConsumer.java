@@ -22,9 +22,9 @@ public class FollowConsumer {
 
   private static final int MAX_RETRY_COUNT = 3;
   private static final String RETRY_HEADER = "follow-retry-count";
-  private static final String LOCK_KEY_PROFIX = "follow_lock:";
+  private static final String LOCK_KEY_PREFIX = "follow_lock:";
   private static final String DELAY_KEY = "follow:delay";
-  private static final String FOLLOW_KEY_PROFIX = "follow:";
+  private static final String FOLLOW_KEY_PREFIX = "follow:";
   private static final int LOCK_WAIT = 3;
   private static final int LOCK_LEASE = 3;
   private static final long DELAY_TIME = 1000 * 5;
@@ -36,7 +36,7 @@ public class FollowConsumer {
   @RabbitListener(queues = RabbitMqConfig.FOLLOW_QUEUE_NAME)
   public void followConsumer(FollowCommand command, Channel channel, Message mqMessage)
       throws Exception {
-    Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
+    long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     // 校验参数
     if (command == null || command.getFanUserId() == null || command.getFollowUserId() == null) {
       log.error("关注消费参数校验失败,fanUserId:{}", command != null ? command.getFanUserId() : null);
@@ -54,7 +54,7 @@ public class FollowConsumer {
     // 进行加锁操作
     RLock lock =
         redissonClient.getLock(
-            LOCK_KEY_PROFIX + command.getFanUserId() + ":" + command.getFollowUserId());
+            LOCK_KEY_PREFIX + command.getFanUserId() + ":" + command.getFollowUserId());
     try {
       boolean isLock = lock.tryLock(LOCK_WAIT, LOCK_LEASE, TimeUnit.SECONDS);
       if (!isLock) {
@@ -66,7 +66,7 @@ public class FollowConsumer {
 
       if ("unfollow".equals(operation)) {
         // 取消关注操作
-        String followKey = FOLLOW_KEY_PROFIX + command.getFanUserId();
+        String followKey = FOLLOW_KEY_PREFIX + command.getFanUserId();
         RSet<String> followSet = redissonClient.getSet(followKey);
         followSet.remove(command.getFollowUserId().toString());
         redissonClient.getScoredSortedSet(DELAY_KEY).add(System.currentTimeMillis() + DELAY_TIME, command);
@@ -76,7 +76,7 @@ public class FollowConsumer {
       } else {
         // 关注操作
         // 将主动关注的用户ID添加到关注集合中当主键，值为被关注的用户ID
-        String followKey = FOLLOW_KEY_PROFIX + command.getFanUserId();
+        String followKey = FOLLOW_KEY_PREFIX + command.getFanUserId();
         RSet<String> followSet = redissonClient.getSet(followKey);
         followSet.add(command.getFollowUserId().toString());
         redissonClient.getScoredSortedSet(DELAY_KEY).add(System.currentTimeMillis() + DELAY_TIME, command);
@@ -101,7 +101,7 @@ public class FollowConsumer {
   @RabbitListener(queues = RabbitMqConfig.FOLLOW_DEAD_QUEUE_NAME)
   public void followDeadConsumer(FollowCommand command, Channel channel, Message mqMessage) {
     log.info("关注操作死信队列消费,fanUserId:{}", command != null ? command.getFanUserId() : null);
-    Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
+    long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
     try {
       consumerRetrySupport.ackDeadLetter(deliveryTag, channel, "关注");
     } catch (Exception e) {

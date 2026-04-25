@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** 信息返回控制器 提供获取作者、视频公开信息的接口 */
@@ -100,6 +101,20 @@ public class InfoController {
     } catch (Exception e) {
       log.error("关注用户失败", e);
       return Result.fail("请重试关注该用户!");
+    }
+  }
+
+  @GetMapping("/followStatus")
+  public Result<Boolean> followStatus(
+      @RequestParam Long followUserId, @RequestParam Long fanUserId) {
+    try {
+      if (followUserId == null || fanUserId == null) {
+        return Result.success(false);
+      }
+      return Result.success(infoService.isFollowed(followUserId, fanUserId));
+    } catch (Exception e) {
+      log.error("获取关注状态失败, followUserId:{}, fanUserId:{}", followUserId, fanUserId, e);
+      return Result.success(false);
     }
   }
 

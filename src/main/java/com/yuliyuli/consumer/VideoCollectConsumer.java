@@ -40,7 +40,7 @@ public class VideoCollectConsumer {
   @RabbitListener(queues = RabbitMqConfig.COLLECT_QUEUE_NAME)
   public void videoCollect(VideoCollection videoCollection, Channel channel, Message mqMessage)
       throws Exception {
-    Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
+    long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
 
     Map<String, Object> headers = mqMessage.getMessageProperties().getHeaders();
     int retryCount = consumerRetrySupport.getRetryCount(mqMessage, RETRY_HEADER);
@@ -48,9 +48,11 @@ public class VideoCollectConsumer {
     if (videoCollection == null
         || videoCollection.getUserId() == null
         || videoCollection.getVideoId() == null) {
-      log.error(
-          "视频收藏消息参数错误,用户ID:{} 视频ID:{}", videoCollection.getUserId(), videoCollection.getVideoId());
-      channel.basicReject(deliveryTag, false);
+        if (videoCollection != null) {
+            log.error(
+                "视频收藏消息参数错误,用户ID:{} 视频ID:{}", videoCollection.getUserId(), videoCollection.getVideoId());
+        }
+        channel.basicReject(deliveryTag, false);
       return;
     }
     String videoId = videoCollection.getVideoId();
@@ -109,9 +111,9 @@ public class VideoCollectConsumer {
   public void videoCollectDeadConsumer(
       VideoCollection videoCollection, Channel channel, Message mqMessage) {
     log.info("收藏死信消费者,用户ID:{} 视频ID:{}", videoCollection.getUserId(), videoCollection.getVideoId());
-    Long diliverTag = mqMessage.getMessageProperties().getDeliveryTag();
+    long deliverTag = mqMessage.getMessageProperties().getDeliveryTag();
     try {
-      consumerRetrySupport.ackDeadLetter(diliverTag, channel, "收藏");
+      consumerRetrySupport.ackDeadLetter(deliverTag, channel, "收藏");
     } catch (Exception e) {
       log.error(
           "死信队列丢弃收藏失败,用户ID:{} 视频ID:{}",

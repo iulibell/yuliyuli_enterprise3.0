@@ -1,5 +1,6 @@
 package com.yuliyuli.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yuliyuli.common.CurrentUserHolder;
 import com.yuliyuli.common.ServiceResult;
 import com.yuliyuli.config.RabbitMqConfig;
@@ -14,10 +15,13 @@ import com.yuliyuli.mapper.FollowMapper;
 import com.yuliyuli.mapper.UserMapper;
 import com.yuliyuli.mapper.VideoMapper;
 import com.yuliyuli.service.InfoService;
+import com.yuliyuli.task.FollowTaskSupport;
 import com.yuliyuli.util.VideoConvertUtil;
 
 import jakarta.annotation.Resource;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
@@ -35,6 +39,8 @@ public class InfoServiceImpl implements InfoService {
   @Resource private UserMapper userMapper;
 
   @Resource private FollowMapper followMapper;
+
+  @Resource private FollowTaskSupport followTaskSupport;
 
   /**
    * 删除视频
@@ -92,17 +98,19 @@ public class InfoServiceImpl implements InfoService {
   @Override
   public UserProfileVO getUserInfo(Long userId) {
     try {
-      User user = userMapper.selectById(userId);
+      User user =
+          userMapper.selectOne(
+              new LambdaQueryWrapper<User>().eq(User::getUserId, userId).last("LIMIT 1"));
       if (user == null) {
-        log.error("用户不存在,用户ID:{}", userId);
+        log.error("用户不存在,业务userId:{}", userId);
         throw new GlobalExceptionHandler.BusinessException("该用户不存在!");
       }
       return buildUserProfile(user, false);
     } catch (GlobalExceptionHandler.BusinessException e) {
       throw e;
     } catch (Exception e) {
-      log.error("获取用户信息失败,用户ID:{}", userId, e);
-      throw new GlobalExceptionHandler.BusinessException("获取用户信息失败,用户ID:" + userId);
+      log.error("获取用户信息失败,业务userId:{}", userId, e);
+      throw new GlobalExceptionHandler.BusinessException("获取用户信息失败,业务userId:" + userId);
     }
   }
 
@@ -140,21 +148,21 @@ public class InfoServiceImpl implements InfoService {
       return ServiceResult.fail("请完成登录");
     }
     try {
+      Long normalizedFollowUserId = normalizeToUserId(followUserId);
+      Long normalizedFanUserId = normalizeToUserId(fanUserId);
       // 检查是否已经关注
-      if (followMapper.getFollow(followUserId, fanUserId) != null) {
-        log.info("用户已经关注了该用户,关注用户ID:{},粉丝用户ID:{}", followUserId, fanUserId);
+      if (hasFollowRelation(followUserId, fanUserId)) {
+        log.info("用户已经关注了该用户,关注用户ID:{},粉丝用户ID:{}", normalizedFollowUserId, normalizedFanUserId);
         return ServiceResult.fail("已经关注该用户");
       }
-      rabbitTemplate.convertAndSend(
-          RabbitMqConfig.FOLLOW_EXCHANGE_NAME,
-          RabbitMqConfig.FOLLOW_ROUTING_KEY,
-          new FollowCommand(followUserId, fanUserId, "follow"));
-      log.info("关注用户传至mq成功,关注用户ID:{}", followUserId);
+      followTaskSupport.processFollowTask(
+          new FollowCommand(normalizedFollowUserId, normalizedFanUserId, "follow"));
+      log.info("关注用户同步处理成功,关注用户ID:{},粉丝用户ID:{}", normalizedFollowUserId, normalizedFanUserId);
       return ServiceResult.success("关注成功");
     } catch (GlobalExceptionHandler.BusinessException e) {
       throw e;
     } catch (Exception e) {
-      log.error("关注用户传至mq失败,关注用户ID:{}", followUserId, e);
+      log.error("关注用户同步处理失败,关注用户ID:{}", followUserId, e);
       return ServiceResult.fail("关注失败,请稍后重试");
     }
   }
@@ -165,17 +173,30 @@ public class InfoServiceImpl implements InfoService {
       return ServiceResult.fail("请完成登录");
     }
     try {
-      rabbitTemplate.convertAndSend(
-          RabbitMqConfig.FOLLOW_EXCHANGE_NAME,
-          RabbitMqConfig.FOLLOW_ROUTING_KEY,
-          new FollowCommand(followUserId, fanUserId, "unfollow"));
-      log.info("取消关注用户传至mq成功,关注用户ID:{}", followUserId);
+      Long normalizedFollowUserId = normalizeToUserId(followUserId);
+      Long normalizedFanUserId = normalizeToUserId(fanUserId);
+      followTaskSupport.processFollowTask(
+          new FollowCommand(normalizedFollowUserId, normalizedFanUserId, "unfollow"));
+      log.info("取消关注用户同步处理成功,关注用户ID:{},粉丝用户ID:{}", normalizedFollowUserId, normalizedFanUserId);
       return ServiceResult.success("取消关注成功");
     } catch (GlobalExceptionHandler.BusinessException e) {
       throw e;
     } catch (Exception e) {
-      log.error("取消关注用户传至mq失败,关注用户ID:{}", followUserId, e);
+      log.error("取消关注用户同步处理失败,关注用户ID:{}", followUserId, e);
       return ServiceResult.fail("取消关注失败,请稍后重试");
+    }
+  }
+
+  @Override
+  public boolean isFollowed(Long followUserId, Long fanUserId) {
+    if (followUserId == null || fanUserId == null) {
+      return false;
+    }
+    try {
+      return hasFollowRelation(followUserId, fanUserId);
+    } catch (Exception e) {
+      log.error("查询关注状态失败, followUserId:{}, fanUserId:{}", followUserId, fanUserId, e);
+      return false;
     }
   }
 
@@ -188,11 +209,57 @@ public class InfoServiceImpl implements InfoService {
 
   private UserProfileVO buildUserProfile(User user, boolean includeUserId) {
     return new UserProfileVO(
-        includeUserId ? user.getId() : null,
+        includeUserId ? user.getUserId() : null,
         user.getUsername(),
         user.getNickname(),
         user.getAvatar(),
         user.getFollowCount() == null ? 0L : user.getFollowCount(),
         user.getFansCount() == null ? 0L : user.getFansCount());
+  }
+
+  private Long normalizeToUserId(Long idOrUserId) {
+    if (idOrUserId == null) {
+      return null;
+    }
+    User byUserId =
+        userMapper.selectOne(
+            new LambdaQueryWrapper<User>().eq(User::getUserId, idOrUserId).last("LIMIT 1"));
+    if (byUserId != null) {
+      return idOrUserId;
+    }
+    User byPrimaryKey = userMapper.selectById(idOrUserId);
+    if (byPrimaryKey != null && byPrimaryKey.getUserId() != null) {
+      return byPrimaryKey.getUserId();
+    }
+    return idOrUserId;
+  }
+
+  private boolean hasFollowRelation(Long followUserId, Long fanUserId) {
+    if (followUserId == null || fanUserId == null) {
+      return false;
+    }
+    Set<Long> followCandidates = buildIdCandidates(followUserId);
+    Set<Long> fanCandidates = buildIdCandidates(fanUserId);
+    for (Long followCandidate : followCandidates) {
+      for (Long fanCandidate : fanCandidates) {
+        if (followMapper.getFollow(followCandidate, fanCandidate) != null) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private Set<Long> buildIdCandidates(Long rawId) {
+    Set<Long> candidates = new LinkedHashSet<>();
+    if (rawId == null) {
+      return candidates;
+    }
+    candidates.add(rawId);
+    Long normalized = normalizeToUserId(rawId);
+    if (normalized != null) {
+      candidates.add(normalized);
+    }
+    return candidates;
   }
 }

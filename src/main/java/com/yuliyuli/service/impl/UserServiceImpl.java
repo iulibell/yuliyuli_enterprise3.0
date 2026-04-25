@@ -28,6 +28,7 @@ import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.data.elasticsearch.core.query.ScriptType;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,7 +68,7 @@ public class UserServiceImpl implements UserService {
     if (!StringUtils.hasText(account) || !StringUtils.hasText(password)) {
       return LoginServiceResult.fail("账号或密码不能为空");
     }
-    if (password.length() < 6 || password.length() > 12) {
+    if (password.length() < 8 || password.length() > 12) {
       return LoginServiceResult.fail("账号或密码错误!");
     }
     LambdaQueryWrapper<User> queryWrapper = userWrapper.buildUserByAccount(account);
@@ -133,11 +134,17 @@ public class UserServiceImpl implements UserService {
         || !StringUtils.hasText(password)) {
       return ServiceResult.fail("手机号、验证码、密码不能为空");
     }
-    if (password.length() < 6 || password.length() > 12) {
-      return ServiceResult.fail("密码长度必须大于等于6位且小于等于12位");
+    if (password.length() < 8 || password.length() > 12) {
+      return ServiceResult.fail("密码需为8-12位");
     }
     if (!phone.matches("^1[3-9]\\d{9}$")) {
       return ServiceResult.fail("请输入有效的11位手机号");
+    }
+
+    // 1.1 校验手机号是否已注册（业务层前置校验）
+    User existedUser = userMapper.selectOne(userWrapper.buildUserByAccount(phone));
+    if (existedUser != null) {
+      return ServiceResult.fail("该手机号已注册，请直接登录");
     }
 
     // 2. 从Redis获取验证码并校验
@@ -180,6 +187,10 @@ public class UserServiceImpl implements UserService {
       redisTemplate.delete(redisKey);
 
       return ServiceResult.success("注册成功!");
+    } catch (DuplicateKeyException e) {
+      // 并发注册场景兜底：数据库唯一约束/索引冲突
+      log.warn("手机号{}重复注册", phone, e);
+      return ServiceResult.fail("该手机号已注册，请直接登录");
     } catch (GlobalExceptionHandler.BusinessException e) {
       throw e;
     } catch (Exception e) {

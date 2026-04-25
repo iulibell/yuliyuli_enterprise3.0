@@ -11,6 +11,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.IndexOperations;
+import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.query.Criteria;
 import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
@@ -66,7 +67,7 @@ public class SearchVideoInit implements CommandLineRunner {
               .build();
 
       SearchHits<VideoDocument> hits = elasticsearchOperations.search(query, VideoDocument.class);
-      List<VideoDocument> list = hits.stream().map(h -> h.getContent()).toList();
+      List<VideoDocument> list = hits.stream().map(SearchHit::getContent).toList();
 
       if (list.isEmpty()) {
         log.warn("没有查询到热门视频");

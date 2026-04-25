@@ -82,7 +82,6 @@ public class LoginInterceptor implements HandlerInterceptor {
    * @param request 请求
    * @param response 响应
    * @param handler 处理程序
-   * @param ex 异常
    */
   @Override
   public void afterCompletion(
